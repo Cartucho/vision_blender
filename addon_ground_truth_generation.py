@@ -14,8 +14,6 @@ bl_info = {
 
 import bpy
 import numpy as np # TODO: check if blender has numpy by dafault
-from pyntcloud import PyntCloud
-
 from bpy.props import (StringProperty,
                    BoolProperty,
                    IntProperty, # TODO: not being used
@@ -30,7 +28,9 @@ from bpy.types import (Panel,
 
 # classes
 class MyAddonProperties(PropertyGroup):
-    ## output dir path
+    # boolean to choose between saving ground truth data or not
+
+    # output dir path
     gt_dir_path : StringProperty(
         name = "",
         default = "",
@@ -38,25 +38,11 @@ class MyAddonProperties(PropertyGroup):
         subtype = 'DIR_PATH'
     )
 
-    is_cam_matrix_selected : BoolProperty(
-        name="Enable or Disable", # TODO: change
-        description="A simple bool property",
-        default = False
-    )
 
-class RENDER_OT_save_projection_matrix(Operator):
-    """Save the camera's projection matrix"""
-    bl_label = "Save Ground Truth"
-    bl_idname = "scene.projection"
-
-    # only saves if at least one of the options is selected
-
-    def execute(self, context):
-        #print(context.scene.my_addon["testprop"])
-        #context.scene.my_addon["testprop"] = 15.0
-        print("save {}".format(5));
-        return {'FINISHED'}
-
+#class RENDER_OT_save_gt_data(bpy.types.Operator):
+#    """ Saves the ground truth data that was created with the add-on """
+#    bl_label = "Save ground truth data"
+#    bl_idname = "RENDER_OT_" # How Blender refers to this operator
 
 class GroundTruthGeneratorPanel(Panel):
     """Creates a Panel in the Output properties window for exporting ground truth data"""
@@ -69,41 +55,31 @@ class RENDER_PT_gt_generator(GroundTruthGeneratorPanel):
     """Parent panel"""
     bl_label = "Ground Truth Generator"
     bl_idname = "RENDER_PT_gt_generator"
-    
+    COMPAT_ENGINES = {'BLENDER_RENDER', 'BLENDER_EEVEE', 'BLENDER_WORKBENCH'}
+    bl_options = {'DEFAULT_CLOSED'}
+
+
+    def draw_header(self, context):
+        rd = context.scene.render
+        self.layout.prop(context.scene.my_addon, "save_gt_data", text="")
+
+
     def draw(self, context):
         layout = self.layout
+        layout.active = context.scene.my_addon.save_gt_data
+
         layout.use_property_split = False
         layout.use_property_decorate = False  # No animation.
 
+        """ select output path """
         layout.label(text="Output directory path:")
         
         # get dir path to store the generated data
         col = layout.column()
         col.prop(context.scene.my_addon, 'gt_dir_path')
-        
-        # save projection matrix
-        col.operator(RENDER_OT_save_projection_matrix.bl_idname)
-        layout.label(text="Select what you want to save:")
-
-
-class RENDER_PT_camera_matrix(GroundTruthGeneratorPanel, Panel):
-    """Panel showing intrinsic, extrinsic, and projection matrix"""
-    bl_label = "Camera Matrix"
-    bl_parent_id = "RENDER_PT_gt_generator"
-    bl_options = {'DEFAULT_CLOSED'}
-    COMPAT_ENGINES = {'BLENDER_RENDER', 'BLENDER_EEVEE', 'BLENDER_WORKBENCH'}
-
-    def draw_header(self, context):
-        self.layout.prop(context.scene.my_addon, "is_cam_matrix_selected", text="")
-        
-    def draw(self, context):
-        layout = self.layout
-        layout.use_property_split = True
-        layout.use_property_decorate = False  # No animation.
-        layout.active = context.scene.my_addon.is_cam_matrix_selected
 
         # Get camera parameters
-        """ intrinsic """
+        """ show intrinsic parameters """
         layout.label(text="Intrinsic parameters [pixels]:")
 
         focal_length = bpy.context.scene.camera.data.lens # TODO: I am assuming [mm]
@@ -149,7 +125,7 @@ class RENDER_PT_camera_matrix(GroundTruthGeneratorPanel, Panel):
         row_intr_2.label(text='0')
         row_intr_2.label(text='1')
 
-        """ extrinsic """
+        """ show extrinsic parameters """
         layout.label(text="Extrinsic parameters [pixels]:")
 
         cam_mat_world = bpy.context.scene.camera.matrix_world.inverted()
@@ -174,48 +150,15 @@ class RENDER_PT_camera_matrix(GroundTruthGeneratorPanel, Panel):
         row_ext_2.label(text=str(cam_mat_world[2][1]))
         row_ext_2.label(text=str(cam_mat_world[2][2]))
         row_ext_2.label(text=str(cam_mat_world[2][3]))
-        
-        """ projection matrix """
-        layout.label(text="Projection matrix [pixels]:")
-        depsgraph = bpy.context.evaluated_depsgraph_get()
-        camera_matrix = bpy.context.scene.camera.calc_matrix_camera(depsgraph, x=resolution_x, y=resolution_y, scale_x=scale_x, scale_y=scale_y)
-        projection_matrix = camera_matrix @ cam_mat_world
-
-        box_proj = self.layout.box()
-        col_proj = box_proj.column()
-
-        row_proj_0 = col_proj.split()
-        row_proj_0.label(text=str(projection_matrix[0][0]))
-        row_proj_0.label(text=str(projection_matrix[0][1]))
-        row_proj_0.label(text=str(projection_matrix[0][2]))
-        row_proj_0.label(text=str(projection_matrix[0][3]))
-
-        row_proj_1 = col_proj.split()
-        row_proj_1.label(text=str(projection_matrix[1][0]))
-        row_proj_1.label(text=str(projection_matrix[1][1]))
-        row_proj_1.label(text=str(projection_matrix[1][2]))
-        row_proj_1.label(text=str(projection_matrix[1][3]))
-
-        row_proj_2 = col_proj.split()
-        row_proj_2.label(text=str(projection_matrix[2][0]))
-        row_proj_2.label(text=str(projection_matrix[2][1]))
-        row_proj_2.label(text=str(projection_matrix[2][2]))
-        row_proj_2.label(text=str(projection_matrix[2][3]))
-
-        row_proj_3 = col_proj.split()
-        row_proj_3.label(text=str(projection_matrix[3][0]))
-        row_proj_3.label(text=str(projection_matrix[3][1]))
-        row_proj_3.label(text=str(projection_matrix[3][2]))
-        row_proj_3.label(text=str(projection_matrix[3][3]))
 
 classes = (
     MyAddonProperties,
-    RENDER_OT_save_projection_matrix,
     RENDER_PT_gt_generator,
-    RENDER_PT_camera_matrix
+    #RENDER_OT_save_gt_data
 )
 
 
+# registration
 def register():
     for cls in classes:
         bpy.utils.register_class(cls)
@@ -231,3 +174,5 @@ def unregister():
 
 if __name__ == "__main__":
     register()
+
+# reference: https://github.com/sobotka/blender/blob/662d94e020f36e75b9c6b4a258f31c1625573ee8/release/scripts/startup/bl_ui/properties_output.py

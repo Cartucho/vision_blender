@@ -1,2 +1,8 @@
 # BlenderVision
-A Blender addon for generating synthetic ground truth data for Computer Vision applications 
+A Blender addon to create synthetic ground truth data for Computer Vision applications.
+
+To install the addon simply go to File > User Preferences > Add-on tab > Install from File...
+
+then select the file `addon_ground_truth_generation.py`
+
+Again in the add-on tab make sure that you enable the add-on once it appears
