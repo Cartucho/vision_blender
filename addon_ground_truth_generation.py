@@ -13,7 +13,7 @@ bl_info = {
     }
 
 import bpy
-import numpy as np # TODO: check if blender has numpy by dafault
+import numpy as np # TODO: check if Blender has numpy by default
 from bpy.props import (StringProperty,
                    BoolProperty,
                    IntProperty, # TODO: not being used
@@ -29,6 +29,11 @@ from bpy.types import (Panel,
 # classes
 class MyAddonProperties(PropertyGroup):
     # boolean to choose between saving ground truth data or not
+    save_gt_data : BoolProperty(
+        name = "Test",
+        default = False,
+        description = "Enable or disable generating ground truth data",
+    )
 
     # output dir path
     gt_dir_path : StringProperty(

@@ -1,5 +1,8 @@
 # BlenderVision
-A Blender addon to create synthetic ground truth data for Computer Vision applications.
+A Blender addon to generate synthetic ground truth data (benchmarks) for Computer Vision applications.
+
+
+
 
 To install the addon simply go to File > User Preferences > Add-on tab > Install from File...
 
