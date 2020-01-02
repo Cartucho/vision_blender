@@ -4,7 +4,7 @@ bl_info = {
         "description":"Generate ground truth data (e.g., depth map) for Computer Vision applications.",
         "author":"Joao Cartucho, YP Li",
         "version":(1, 0),
-        "blender":(2, 81, 0),
+        "blender":(2, 81, 16),
         "location":"PROPERTIES",
         "warning":"", # used for warning icon and text in addons panel
         "wiki_url":"",
@@ -30,9 +30,9 @@ from bpy.types import (Panel,
 class MyAddonProperties(PropertyGroup):
     # boolean to choose between saving ground truth data or not
     save_gt_data : BoolProperty(
-        name = "Test",
-        default = True,
-        description = "Enable or disable generating ground truth data",
+        name = "Ground truth",
+        default = False,
+        description = "Save ground truth data",
     )
 
     # output dir path
@@ -163,12 +163,30 @@ classes = (
 )
 
 
+def run_script(scene): # TODO: not sure if this is the best place to put this
+    """ This script runs everytime we render a new frame """
+    # ref: https://blenderartists.org/t/how-to-run-script-on-every-frame-in-blender-render/699404/2
+    # check if output path has been defined
+    gt_dir_path = scene.my_addon.gt_dir_path
+    if gt_dir_path == "":
+        print("Please select path!")
+    else:
+        print("Very good!")
+        print("path:{}".format(scene.my_addon.gt_dir_path))
+    ## test non existing path
+    # camera parameters
+    ## extrinsic
+    cam_mat_world = bpy.context.scene.camera.matrix_world.inverted()
+    print(cam_mat_world)
+
+
 # registration
 def register():
     for cls in classes:
         bpy.utils.register_class(cls)
     # register the properties
     bpy.types.Scene.my_addon = PointerProperty(type=MyAddonProperties)
+    bpy.app.handlers.render_pre.append(run_script)
 
 
 def unregister():
@@ -176,7 +194,8 @@ def unregister():
         bpy.utils.unregister_class(cls)
     # unregister the properties
     del bpy.types.Scene.my_addon
-
+    bpy.app.handlers.render_pre.remove(run_script)
+    
 if __name__ == "__main__":
     register()
 
