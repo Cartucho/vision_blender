@@ -31,7 +31,7 @@ class MyAddonProperties(PropertyGroup):
     # boolean to choose between saving ground truth data or not
     save_gt_data : BoolProperty(
         name = "Test",
-        default = False,
+        default = True,
         description = "Enable or disable generating ground truth data",
     )
 
