@@ -13,6 +13,7 @@ bl_info = {
     }
 
 import bpy
+import os
 import numpy as np # TODO: check if Blender has numpy by default
 from bpy.props import (StringProperty, # TODO: not being used
                    BoolProperty,
@@ -25,6 +26,7 @@ from bpy.types import (Panel,
                    Operator,
                    PropertyGroup
                    )
+from bpy.app.handlers import persistent
 
 # classes
 class MyAddonProperties(PropertyGroup):
@@ -148,22 +150,24 @@ classes = (
 )
 
 
-def run_script(scene): # TODO: not sure if this is the best place to put this
+@persistent
+def load_handler(scene): # TODO: not sure if this is the best place to put this
     """ This script runs everytime we render a new frame """
     # ref: https://blenderartists.org/t/how-to-run-script-on-every-frame-in-blender-render/699404/2
+    # check if user wants to generate the ground truth data
+    if scene.my_addon.save_gt_data:
+        gt_dir_path = scene.render.filepath
+        print(gt_dir_path)
+        # save ground truth data
+        ## camera parameters
+        ### extrinsic
+        cam_mat_world = bpy.context.scene.camera.matrix_world.inverted()
+        cam_mat_world_numpy = np.array(cam_mat_world)
+        cam_para_ext_path = os.path.join(gt_dir_path, 'cam_param_extrinsic_{}.out'.format(scene.frame_current))
+        np.savetxt(cam_para_ext_path, cam_mat_world_numpy)
 
-    gt_dir_path = scene.render.filepath
-    print(gt_dir_path)
-    
-    print(scene.my_addon.save_gt_data)
-
-    #scene.my_addon.gt_dir_path
-    """
-    # camera parameters
-    ## extrinsic
-    cam_mat_world = bpy.context.scene.camera.matrix_world.inverted()
-    print(cam_mat_world)
-    """
+        print(cam_mat_world)
+        print(scene.frame_current)
 
 
 # registration
@@ -174,7 +178,7 @@ def register():
     # register the properties
     bpy.types.Scene.my_addon = PointerProperty(type=MyAddonProperties)
     # register the function being called when rendering
-    bpy.app.handlers.render_pre.append(run_script)
+    bpy.app.handlers.render_pre.append(load_handler)
 
 
 def unregister():
