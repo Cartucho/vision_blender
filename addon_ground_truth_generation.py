@@ -14,7 +14,7 @@ bl_info = {
 
 import bpy
 import numpy as np # TODO: check if Blender has numpy by default
-from bpy.props import (StringProperty,
+from bpy.props import (StringProperty, # TODO: not being used
                    BoolProperty,
                    IntProperty, # TODO: not being used
                    FloatProperty, # TODO: not being used
@@ -33,14 +33,6 @@ class MyAddonProperties(PropertyGroup):
         name = "Ground truth",
         default = False,
         description = "Save ground truth data",
-    )
-
-    # output dir path
-    gt_dir_path : StringProperty(
-        name = "",
-        default = "",
-        description = "Define the directory path for storing data",
-        subtype = 'DIR_PATH'
     )
 
 
@@ -75,13 +67,6 @@ class RENDER_PT_gt_generator(GroundTruthGeneratorPanel):
 
         layout.use_property_split = False
         layout.use_property_decorate = False  # No animation.
-
-        """ select output path """
-        layout.label(text="Output directory path:")
-        
-        # get dir path to store the generated data
-        col = layout.column()
-        col.prop(context.scene.my_addon, 'gt_dir_path')
 
         # Get camera parameters
         """ show intrinsic parameters """
@@ -166,36 +151,41 @@ classes = (
 def run_script(scene): # TODO: not sure if this is the best place to put this
     """ This script runs everytime we render a new frame """
     # ref: https://blenderartists.org/t/how-to-run-script-on-every-frame-in-blender-render/699404/2
-    # check if output path has been defined
-    gt_dir_path = scene.my_addon.gt_dir_path
-    if gt_dir_path == "":
-        print("Please select path!")
-    else:
-        print("Very good!")
-        print("path:{}".format(scene.my_addon.gt_dir_path))
-    ## test non existing path
+
+    gt_dir_path = scene.render.filepath
+    print(gt_dir_path)
+    
+    print(scene.my_addon.save_gt_data)
+
+    #scene.my_addon.gt_dir_path
+    """
     # camera parameters
     ## extrinsic
     cam_mat_world = bpy.context.scene.camera.matrix_world.inverted()
     print(cam_mat_world)
+    """
 
 
 # registration
 def register():
+    # register the classes
     for cls in classes:
         bpy.utils.register_class(cls)
     # register the properties
     bpy.types.Scene.my_addon = PointerProperty(type=MyAddonProperties)
+    # register the function being called when rendering
     bpy.app.handlers.render_pre.append(run_script)
 
 
 def unregister():
+    # unregister the classes
     for cls in classes:
         bpy.utils.unregister_class(cls)
     # unregister the properties
     del bpy.types.Scene.my_addon
+    # unregister the function being called when rendering
     bpy.app.handlers.render_pre.remove(run_script)
-    
+
 if __name__ == "__main__":
     register()
 
