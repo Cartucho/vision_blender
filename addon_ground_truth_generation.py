@@ -28,6 +28,9 @@ from bpy.types import (Panel,
                    )
 from bpy.app.handlers import persistent
 
+
+intrinsic_mat = np.array([[0, 0, 0], [0, 0, 0], [0, 0, 1]])
+
 # classes
 class MyAddonProperties(PropertyGroup):
     # boolean to choose between saving ground truth data or not
@@ -52,6 +55,7 @@ class GroundTruthGeneratorPanel(Panel):
 
 class RENDER_PT_gt_generator(GroundTruthGeneratorPanel):
     """Parent panel"""
+    global intrinsic_mat
     bl_label = "Ground Truth Generator"
     bl_idname = "RENDER_PT_gt_generator"
     COMPAT_ENGINES = {'BLENDER_RENDER', 'BLENDER_EEVEE', 'BLENDER_WORKBENCH'}
@@ -117,6 +121,12 @@ class RENDER_PT_gt_generator(GroundTruthGeneratorPanel):
         row_intr_2.label(text='0')
         row_intr_2.label(text='1')
 
+        ## update the global variable of the intrinsic mat
+        intrinsic_mat[0, 0] = f_x
+        intrinsic_mat[0, 2] = c_x
+        intrinsic_mat[1, 1] = f_y
+        intrinsic_mat[1, 2] = c_y
+
         """ show extrinsic parameters """
         layout.label(text="Extrinsic parameters [pixels]:")
 
@@ -157,17 +167,20 @@ def load_handler(scene): # TODO: not sure if this is the best place to put this
     # check if user wants to generate the ground truth data
     if scene.my_addon.save_gt_data:
         gt_dir_path = scene.render.filepath
-        print(gt_dir_path)
+        #print(gt_dir_path)
         # save ground truth data
+        #print(scene.frame_current)
         ## camera parameters
         ### extrinsic
         cam_mat_world = bpy.context.scene.camera.matrix_world.inverted()
-        cam_mat_world_numpy = np.array(cam_mat_world)
-        cam_para_ext_path = os.path.join(gt_dir_path, 'cam_param_extrinsic_{}.out'.format(scene.frame_current))
-        np.savetxt(cam_para_ext_path, cam_mat_world_numpy)
+        extrinsic_mat = np.array(cam_mat_world)
+        cam_para_path_extr = os.path.join(gt_dir_path, 'cam_param_extrinsic_{}.out'.format(scene.frame_current))
+        np.savetxt(cam_para_path_extr, extrinsic_mat)
+        ### intrinsic
+        #print(intrinsic_mat)
+        cam_para_path_intr = os.path.join(gt_dir_path, 'cam_param_intrinsic_{}.out'.format(scene.frame_current))
+        np.savetxt(cam_para_path_intr, intrinsic_mat)
 
-        print(cam_mat_world)
-        print(scene.frame_current)
 
 
 # registration
