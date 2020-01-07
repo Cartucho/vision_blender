@@ -82,6 +82,7 @@ class RENDER_PT_gt_generator(GroundTruthGeneratorPanel):
         resolution_scale = (bpy.context.scene.render.resolution_percentage / 100.0)
         resolution_x = bpy.context.scene.render.resolution_x * resolution_scale # [pixels]
         resolution_y = bpy.context.scene.render.resolution_y * resolution_scale # [pixels]
+
         sensor_width = bpy.context.scene.camera.data.sensor_width # [mm]
         sensor_height = bpy.context.scene.camera.data.sensor_height # [mm]
         ### f_x
@@ -154,14 +155,15 @@ class RENDER_PT_gt_generator(GroundTruthGeneratorPanel):
         row_ext_2.label(text=str(cam_mat_world[2][3]))
 
 classes = (
-    MyAddonProperties,
     RENDER_PT_gt_generator,
+    MyAddonProperties,
     #RENDER_OT_save_gt_data
 )
 
 
 @persistent
 def load_handler_render_init(scene):
+    # TODO: I think there is a bug in this function because sometimes it crashes when starting
     print("Initialization of a render job")
 
     bpy.context.scene.use_nodes = True
@@ -171,19 +173,19 @@ def load_handler_render_init(scene):
     # check connections
     tree = bpy.context.scene.node_tree
     rl = bpy.context.scene.node_tree.nodes["Render Layers"]
-    viewer_ind = tree.nodes.find("Viewer")
     v = None
+    viewer_ind = tree.nodes.find("Viewer")
     if viewer_ind == -1:
         v = tree.nodes.new("CompositorNodeViewer")
     else:
-        v = bpy.context.scene.node_tree.nodes["Viewer"]
+        v = bpy.context.scene.node_tree.nodes[viewer_ind]
     # create new links if necessary
     links = tree.links
     if not v.inputs["Image"].is_linked:
         links.new(rl.outputs["Image"], v.inputs["Image"])
     if not v.inputs["Z"].is_linked:
-        links.new(rl.outputs["Depth"], v.inputs["Z"])
-
+        links.new(rl.outputs["Depth"], v.inputs["Alpha"]) # link Render Z to Viewer Alpha
+        # Connecting to the Alpha is a trick so that we can get the Zmap
 
 @persistent
 def load_handler_render_frame(scene): # TODO: not sure if this is the best place to put this
@@ -206,6 +208,18 @@ def load_handler_render_frame(scene): # TODO: not sure if this is the best place
         #print(intrinsic_mat)
         cam_para_path_intr = os.path.join(gt_dir_path, 'cam_param_intrinsic_{}.out'.format(scene.frame_current))
         np.savetxt(cam_para_path_intr, intrinsic_mat)
+        """ Zmap """
+        pixels = bpy.data.images['Viewer Node'].pixels
+        print(len(pixels)) # size = width * height * 4 (rgba)
+        pixels_numpy = np.array(pixels[:])
+        # TODO: repeated code - START
+        resolution_scale = (bpy.context.scene.render.resolution_percentage / 100.0)
+        resolution_x = int(bpy.context.scene.render.resolution_x * resolution_scale) # [pixels]
+        resolution_y = int(bpy.context.scene.render.resolution_y * resolution_scale) # [pixels]
+        # TODO: repeated code - END
+        pixels_numpy.resize((resolution_x, resolution_y, 4))
+        print(pixels_numpy.shape)
+        print(pixels_numpy[0, 0, 3])
 
 
 # registration
