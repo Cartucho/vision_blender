@@ -174,7 +174,8 @@ def load_handler(scene): # TODO: not sure if this is the best place to put this
         ### extrinsic
         cam_mat_world = bpy.context.scene.camera.matrix_world.inverted()
         extrinsic_mat = np.array(cam_mat_world)
-        cam_para_path_extr = os.path.join(gt_dir_path, 'cam_param_extrinsic_{}.out'.format(scene.frame_current))
+        #### note: by default blender has 4 padded zeros
+        cam_para_path_extr = os.path.join(gt_dir_path, 'cam_param_extrinsic_{}.out'.format(scene.frame_current)) # TODO: %04d
         np.savetxt(cam_para_path_extr, extrinsic_mat)
         ### intrinsic
         #print(intrinsic_mat)
@@ -207,3 +208,22 @@ if __name__ == "__main__":
     register()
 
 # reference: https://github.com/sobotka/blender/blob/662d94e020f36e75b9c6b4a258f31c1625573ee8/release/scripts/startup/bl_ui/properties_output.py
+
+
+"""
+import bpy
+
+bpy.context.scene.use_nodes = True
+bpy.context.scene.view_layers["View Layer"].use_pass_z = True
+bpy.context.scene.view_layers["View Layer"].use_pass_normal = True
+
+# create output node
+tree = bpy.context.scene.node_tree
+rl = bpy.context.scene.node_tree.nodes["Render Layers"]
+v = tree.nodes.new("CompositorNodeViewer")
+
+# create new links
+links = tree.links
+links.new(rl.outputs["Image"], v.inputs["Image"])
+links.new(rl.outputs["Depth"], v.inputs["Z"])
+"""
