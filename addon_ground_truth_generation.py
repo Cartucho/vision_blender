@@ -36,7 +36,7 @@ class MyAddonProperties(PropertyGroup):
     # boolean to choose between saving ground truth data or not
     save_gt_data : BoolProperty(
         name = "Ground truth",
-        default = False,
+        default = True,
         description = "Save ground truth data",
     )
 
@@ -161,8 +161,33 @@ classes = (
 
 
 @persistent
-def load_handler(scene): # TODO: not sure if this is the best place to put this
-    """ This script runs everytime we render a new frame """
+def load_handler_render_init(scene):
+    print("Initialization of a render job")
+
+    bpy.context.scene.use_nodes = True
+    bpy.context.scene.view_layers["View Layer"].use_pass_z = True
+    bpy.context.scene.view_layers["View Layer"].use_pass_normal = True
+
+    # check connections
+    tree = bpy.context.scene.node_tree
+    rl = bpy.context.scene.node_tree.nodes["Render Layers"]
+    viewer_ind = tree.nodes.find("Viewer")
+    v = None
+    if viewer_ind == -1:
+        v = tree.nodes.new("CompositorNodeViewer")
+    else:
+        v = bpy.context.scene.node_tree.nodes["Viewer"]
+    # create new links if necessary
+    links = tree.links
+    if not v.inputs["Image"].is_linked:
+        links.new(rl.outputs["Image"], v.inputs["Image"])
+    if not v.inputs["Z"].is_linked:
+        links.new(rl.outputs["Depth"], v.inputs["Z"])
+
+
+@persistent
+def load_handler_render_frame(scene): # TODO: not sure if this is the best place to put this
+    """ This script runs after rendering each frame """
     # ref: https://blenderartists.org/t/how-to-run-script-on-every-frame-in-blender-render/699404/2
     # check if user wants to generate the ground truth data
     if scene.my_addon.save_gt_data:
@@ -170,7 +195,7 @@ def load_handler(scene): # TODO: not sure if this is the best place to put this
         #print(gt_dir_path)
         # save ground truth data
         #print(scene.frame_current)
-        ## camera parameters
+        """ camera parameters """
         ### extrinsic
         cam_mat_world = bpy.context.scene.camera.matrix_world.inverted()
         extrinsic_mat = np.array(cam_mat_world)
@@ -183,7 +208,6 @@ def load_handler(scene): # TODO: not sure if this is the best place to put this
         np.savetxt(cam_para_path_intr, intrinsic_mat)
 
 
-
 # registration
 def register():
     # register the classes
@@ -191,8 +215,10 @@ def register():
         bpy.utils.register_class(cls)
     # register the properties
     bpy.types.Scene.my_addon = PointerProperty(type=MyAddonProperties)
-    # register the function being called when rendering
-    bpy.app.handlers.render_pre.append(load_handler)
+    # register the function being called when rendering starts
+    bpy.app.handlers.render_init.append(load_handler_render_init)
+    # register the function being called after rendering each frame
+    bpy.app.handlers.render_post.append(load_handler_render_frame)
 
 
 def unregister():
@@ -201,29 +227,12 @@ def unregister():
         bpy.utils.unregister_class(cls)
     # unregister the properties
     del bpy.types.Scene.my_addon
-    # unregister the function being called when rendering
-    bpy.app.handlers.render_pre.remove(run_script)
+    # unregister the function being called when rendering each frame
+    bpy.app.handlers.render_init.remove(load_handler_render_init)
+    # unregister the function being called when rendering each frame
+    bpy.app.handlers.render_post.remove(load_handler_render_frame)
 
 if __name__ == "__main__":
     register()
 
 # reference: https://github.com/sobotka/blender/blob/662d94e020f36e75b9c6b4a258f31c1625573ee8/release/scripts/startup/bl_ui/properties_output.py
-
-
-"""
-import bpy
-
-bpy.context.scene.use_nodes = True
-bpy.context.scene.view_layers["View Layer"].use_pass_z = True
-bpy.context.scene.view_layers["View Layer"].use_pass_normal = True
-
-# create output node
-tree = bpy.context.scene.node_tree
-rl = bpy.context.scene.node_tree.nodes["Render Layers"]
-v = tree.nodes.new("CompositorNodeViewer")
-
-# create new links
-links = tree.links
-links.new(rl.outputs["Image"], v.inputs["Image"])
-links.new(rl.outputs["Depth"], v.inputs["Z"])
-"""
