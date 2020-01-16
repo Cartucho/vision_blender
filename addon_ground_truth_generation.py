@@ -29,33 +29,38 @@ from bpy.types import (Panel,
 from bpy.app.handlers import persistent
 
 
-def get_camera_parameters_intrinsic():
-    """ Get intrinsic camera parameters: focal length and principal point. """
-    focal_length = bpy.context.scene.camera.data.lens # TODO: I am assuming [mm]
-    resolution_scale = (bpy.context.scene.render.resolution_percentage / 100.0)
-    resolution_x = bpy.context.scene.render.resolution_x * resolution_scale # [pixels]
-    resolution_y = bpy.context.scene.render.resolution_y * resolution_scale # [pixels]
+def get_scene_resolution(scene):
+    resolution_scale = (scene.render.resolution_percentage / 100.0)
+    resolution_x = scene.render.resolution_x * resolution_scale # [pixels]
+    resolution_y = scene.render.resolution_y * resolution_scale # [pixels]
+    return int(resolution_x), int(resolution_y)
 
-    sensor_width = bpy.context.scene.camera.data.sensor_width # [mm]
-    sensor_height = bpy.context.scene.camera.data.sensor_height # [mm]
+
+def get_camera_parameters_intrinsic(scene):
+    """ Get intrinsic camera parameters: focal length and principal point. """
+    focal_length = scene.camera.data.lens # TODO: I am assuming [mm]
+    res_x, res_y = get_scene_resolution(scene)
+
+    sensor_width = scene.camera.data.sensor_width # [mm]
+    sensor_height = scene.camera.data.sensor_height # [mm]
     ### f_x
-    f_x = focal_length * (resolution_x / sensor_width) # [pixels]
+    f_x = focal_length * (res_x / sensor_width) # [pixels]
     ### f_y
-    f_y = focal_length * (resolution_y / sensor_height) # [pixels]
-    scale_x = bpy.context.scene.render.pixel_aspect_x
-    scale_y = bpy.context.scene.render.pixel_aspect_y
+    f_y = focal_length * (res_y / sensor_height) # [pixels]
+    scale_x = scene.render.pixel_aspect_x
+    scale_y = scene.render.pixel_aspect_y
     pixel_aspect_ratio = scale_x / scale_y
     if pixel_aspect_ratio != 1.0:
-        if bpy.context.scene.camera.data.sensor_fit == 'VERTICAL':
+        if scene.camera.data.sensor_fit == 'VERTICAL':
             f_x = f_x / pixel_aspect_ratio
         else:
             f_y = f_y * pixel_aspect_ratio  
     ### c_x
-    shift_x = bpy.context.scene.camera.data.shift_x # [mm]
-    c_x = (resolution_x - 1) / 2.0 #+ shift_pixels_x [pixels] TODO: shift_x to pixel
+    shift_x = scene.camera.data.shift_x # [mm]
+    c_x = (res_x - 1) / 2.0 #+ shift_pixels_x [pixels] TODO: shift_x to pixel
     ### c_y
-    shift_y = bpy.context.scene.camera.data.shift_y # [mm]
-    c_y = (resolution_y - 1) /2.0 #+ shift_pixels_y [pixels] TODO: shift_y to pixel
+    shift_y = scene.camera.data.shift_y # [mm]
+    c_y = (res_y - 1) /2.0 #+ shift_pixels_y [pixels] TODO: shift_y to pixel
 
     return f_x, f_y, c_x, c_y
 
@@ -106,7 +111,7 @@ class RENDER_PT_gt_generator(GroundTruthGeneratorPanel):
         # Get camera parameters
         """ show intrinsic parameters """
         layout.label(text="Intrinsic parameters [pixels]:")
-        f_x, f_y, c_x, c_y = get_camera_parameters_intrinsic()
+        f_x, f_y, c_x, c_y = get_camera_parameters_intrinsic(context.scene)
 
         box_intr = self.layout.box()
         col_intr = box_intr.column()
@@ -129,7 +134,7 @@ class RENDER_PT_gt_generator(GroundTruthGeneratorPanel):
         """ show extrinsic parameters """
         layout.label(text="Extrinsic parameters [pixels]:")
 
-        cam_mat_world = bpy.context.scene.camera.matrix_world.inverted()
+        cam_mat_world = context.scene.camera.matrix_world.inverted()
         
         box_ext = self.layout.box()
         col_ext = box_ext.column()
@@ -159,9 +164,8 @@ classes = (
 )
 
 
-@persistent
+@persistent # TODO: not sure if I should be using @persistent
 def load_handler_render_init(scene):
-    # TODO: I think there is a bug in this function because sometimes it crashes when starting
     print("Initialization of a render job")
 
     if not scene.use_nodes:
@@ -183,14 +187,15 @@ def load_handler_render_init(scene):
 
     # create new links if necessary
     links = tree.links
+    # Trick: we already have the RGB image so we can connect the Normal to Image
+    #        and the Z to the Alpha channel
     if not v.inputs["Image"].is_linked:
-        links.new(rl.outputs["Image"], v.inputs["Image"])
+        links.new(rl.outputs["Normal"], v.inputs["Image"])  # link Render Normals to Viewer Image
     if not v.inputs["Z"].is_linked:
         links.new(rl.outputs["Depth"], v.inputs["Alpha"]) # link Render Z to Viewer Alpha
-        # Connecting to the Alpha is a trick so that we can get the Zmap
 
 
-@persistent
+@persistent # TODO: not sure if I should be using @persistent
 def load_handler_after_rend_frame(scene): # TODO: not sure if this is the best place to put this
     """ This script runs after rendering each frame """
     # ref: https://blenderartists.org/t/how-to-run-script-on-every-frame-in-blender-render/699404/2
@@ -200,32 +205,38 @@ def load_handler_after_rend_frame(scene): # TODO: not sure if this is the best p
         #print(gt_dir_path)
         # save ground truth data
         #print(scene.frame_current)
-        """ camera parameters """
+        """ Camera parameters """
         ### extrinsic
         cam_mat_world = bpy.context.scene.camera.matrix_world.inverted()
         extrinsic_mat = np.array(cam_mat_world)
-        #### note: by default blender has 4 padded zeros
-        cam_para_path_extr = os.path.join(gt_dir_path, 'cam_param_extrinsic_{}.out'.format(scene.frame_current)) # TODO: %04d
-        np.savetxt(cam_para_path_extr, extrinsic_mat)
         ### intrinsic
-        f_x, f_y, c_x, c_y = get_camera_parameters_intrinsic()
+        f_x, f_y, c_x, c_y = get_camera_parameters_intrinsic(scene)
         intrinsic_mat = np.array([[f_x, 0, c_x],
                                   [0, f_y, c_y],
                                   [0,   0,   1]])
-        cam_para_path_intr = os.path.join(gt_dir_path, 'cam_param_intrinsic_{}.out'.format(scene.frame_current))
-        np.savetxt(cam_para_path_intr, intrinsic_mat)
-        """ Zmap """
+        """ Zmap + Normal """
         pixels = bpy.data.images['Viewer Node'].pixels
         #print(len(pixels)) # size = width * height * 4 (rgba)
         pixels_numpy = np.array(pixels[:])
-        # TODO: repeated code - START
-        resolution_scale = (bpy.context.scene.render.resolution_percentage / 100.0)
-        resolution_x = int(bpy.context.scene.render.resolution_x * resolution_scale) # [pixels]
-        resolution_y = int(bpy.context.scene.render.resolution_y * resolution_scale) # [pixels]
-        # TODO: repeated code - END
-        pixels_numpy.resize((resolution_x, resolution_y, 4))
-        #print(pixels_numpy.shape)
-        #print(pixels_numpy[0, 0, 3])
+        res_x, res_y = get_scene_resolution(scene)
+        """
+           .---> y
+           |
+           |
+           v
+            x
+        """
+        pixels_numpy.resize((res_y, res_x, 4)) # Numpy works with (y, x, channels)
+        z = pixels_numpy[:, :, 3]
+        normal = pixels_numpy[:, :, 0:3]
+        """ Save data """
+        out_path = os.path.join(gt_dir_path, 'gt_{}.npz'.format(scene.frame_current))
+        np.savez_compressed(out_path,
+                            intr=intrinsic_mat,
+                            extr=extrinsic_mat,
+                            z_map=z,
+                            normal_map=normal
+                           )
 
 
 # registration
