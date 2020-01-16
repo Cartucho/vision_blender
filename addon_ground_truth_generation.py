@@ -29,7 +29,36 @@ from bpy.types import (Panel,
 from bpy.app.handlers import persistent
 
 
-intrinsic_mat = np.array([[0, 0, 0], [0, 0, 0], [0, 0, 1]])
+def get_camera_parameters_intrinsic():
+    """ Get intrinsic camera parameters: focal length and principal point. """
+    focal_length = bpy.context.scene.camera.data.lens # TODO: I am assuming [mm]
+    resolution_scale = (bpy.context.scene.render.resolution_percentage / 100.0)
+    resolution_x = bpy.context.scene.render.resolution_x * resolution_scale # [pixels]
+    resolution_y = bpy.context.scene.render.resolution_y * resolution_scale # [pixels]
+
+    sensor_width = bpy.context.scene.camera.data.sensor_width # [mm]
+    sensor_height = bpy.context.scene.camera.data.sensor_height # [mm]
+    ### f_x
+    f_x = focal_length * (resolution_x / sensor_width) # [pixels]
+    ### f_y
+    f_y = focal_length * (resolution_y / sensor_height) # [pixels]
+    scale_x = bpy.context.scene.render.pixel_aspect_x
+    scale_y = bpy.context.scene.render.pixel_aspect_y
+    pixel_aspect_ratio = scale_x / scale_y
+    if pixel_aspect_ratio != 1.0:
+        if bpy.context.scene.camera.data.sensor_fit == 'VERTICAL':
+            f_x = f_x / pixel_aspect_ratio
+        else:
+            f_y = f_y * pixel_aspect_ratio  
+    ### c_x
+    shift_x = bpy.context.scene.camera.data.shift_x # [mm]
+    c_x = (resolution_x - 1) / 2.0 #+ shift_pixels_x [pixels] TODO: shift_x to pixel
+    ### c_y
+    shift_y = bpy.context.scene.camera.data.shift_y # [mm]
+    c_y = (resolution_y - 1) /2.0 #+ shift_pixels_y [pixels] TODO: shift_y to pixel
+
+    return f_x, f_y, c_x, c_y
+
 
 # classes
 class MyAddonProperties(PropertyGroup):
@@ -77,32 +106,7 @@ class RENDER_PT_gt_generator(GroundTruthGeneratorPanel):
         # Get camera parameters
         """ show intrinsic parameters """
         layout.label(text="Intrinsic parameters [pixels]:")
-
-        focal_length = bpy.context.scene.camera.data.lens # TODO: I am assuming [mm]
-        resolution_scale = (bpy.context.scene.render.resolution_percentage / 100.0)
-        resolution_x = bpy.context.scene.render.resolution_x * resolution_scale # [pixels]
-        resolution_y = bpy.context.scene.render.resolution_y * resolution_scale # [pixels]
-
-        sensor_width = bpy.context.scene.camera.data.sensor_width # [mm]
-        sensor_height = bpy.context.scene.camera.data.sensor_height # [mm]
-        ### f_x
-        f_x = focal_length * (resolution_x / sensor_width) # [pixels]
-        ### f_y
-        f_y = focal_length * (resolution_y / sensor_height) # [pixels]
-        scale_x = bpy.context.scene.render.pixel_aspect_x
-        scale_y = bpy.context.scene.render.pixel_aspect_y
-        pixel_aspect_ratio = scale_x / scale_y
-        if pixel_aspect_ratio != 1.0:
-            if bpy.context.scene.camera.data.sensor_fit == 'VERTICAL':
-                f_x = f_x / pixel_aspect_ratio
-            else:
-                f_y = f_y * pixel_aspect_ratio  
-        ### c_x
-        shift_x = bpy.context.scene.camera.data.shift_x # [mm]
-        c_x = (resolution_x - 1) / 2.0 #+ shift_pixels_x [pixels] TODO: shift_x to pixel
-        ### c_y
-        shift_y = bpy.context.scene.camera.data.shift_y # [mm]
-        c_y = (resolution_y - 1) /2.0 #+ shift_pixels_y [pixels] TODO: shift_y to pixel
+        f_x, f_y, c_x, c_y = get_camera_parameters_intrinsic()
 
         box_intr = self.layout.box()
         col_intr = box_intr.column()
@@ -121,12 +125,6 @@ class RENDER_PT_gt_generator(GroundTruthGeneratorPanel):
         row_intr_2.label(text='0')
         row_intr_2.label(text='0')
         row_intr_2.label(text='1')
-
-        ## update the global variable of the intrinsic mat
-        intrinsic_mat[0, 0] = f_x
-        intrinsic_mat[0, 2] = c_x
-        intrinsic_mat[1, 1] = f_y
-        intrinsic_mat[1, 2] = c_y
 
         """ show extrinsic parameters """
         layout.label(text="Extrinsic parameters [pixels]:")
@@ -166,19 +164,23 @@ def load_handler_render_init(scene):
     # TODO: I think there is a bug in this function because sometimes it crashes when starting
     print("Initialization of a render job")
 
-    bpy.context.scene.use_nodes = True
-    bpy.context.scene.view_layers["View Layer"].use_pass_z = True
-    bpy.context.scene.view_layers["View Layer"].use_pass_normal = True
+    if not scene.use_nodes:
+        scene.use_nodes = True
+    if not scene.view_layers["View Layer"].use_pass_z:
+        scene.view_layers["View Layer"].use_pass_z = True
+    if not scene.view_layers["View Layer"].use_pass_normal:
+        scene.view_layers["View Layer"].use_pass_normal = True
 
     # check connections
-    tree = bpy.context.scene.node_tree
-    rl = bpy.context.scene.node_tree.nodes["Render Layers"]
+    tree = scene.node_tree
+    rl = scene.node_tree.nodes["Render Layers"]
     v = None
     viewer_ind = tree.nodes.find("Viewer")
     if viewer_ind == -1:
         v = tree.nodes.new("CompositorNodeViewer")
     else:
-        v = bpy.context.scene.node_tree.nodes[viewer_ind]
+        v = scene.node_tree.nodes[viewer_ind]
+
     # create new links if necessary
     links = tree.links
     if not v.inputs["Image"].is_linked:
@@ -187,8 +189,9 @@ def load_handler_render_init(scene):
         links.new(rl.outputs["Depth"], v.inputs["Alpha"]) # link Render Z to Viewer Alpha
         # Connecting to the Alpha is a trick so that we can get the Zmap
 
+
 @persistent
-def load_handler_render_frame(scene): # TODO: not sure if this is the best place to put this
+def load_handler_after_rend_frame(scene): # TODO: not sure if this is the best place to put this
     """ This script runs after rendering each frame """
     # ref: https://blenderartists.org/t/how-to-run-script-on-every-frame-in-blender-render/699404/2
     # check if user wants to generate the ground truth data
@@ -205,12 +208,15 @@ def load_handler_render_frame(scene): # TODO: not sure if this is the best place
         cam_para_path_extr = os.path.join(gt_dir_path, 'cam_param_extrinsic_{}.out'.format(scene.frame_current)) # TODO: %04d
         np.savetxt(cam_para_path_extr, extrinsic_mat)
         ### intrinsic
-        #print(intrinsic_mat)
+        f_x, f_y, c_x, c_y = get_camera_parameters_intrinsic()
+        intrinsic_mat = np.array([[f_x, 0, c_x],
+                                  [0, f_y, c_y],
+                                  [0,   0,   1]])
         cam_para_path_intr = os.path.join(gt_dir_path, 'cam_param_intrinsic_{}.out'.format(scene.frame_current))
         np.savetxt(cam_para_path_intr, intrinsic_mat)
         """ Zmap """
         pixels = bpy.data.images['Viewer Node'].pixels
-        print(len(pixels)) # size = width * height * 4 (rgba)
+        #print(len(pixels)) # size = width * height * 4 (rgba)
         pixels_numpy = np.array(pixels[:])
         # TODO: repeated code - START
         resolution_scale = (bpy.context.scene.render.resolution_percentage / 100.0)
@@ -218,8 +224,8 @@ def load_handler_render_frame(scene): # TODO: not sure if this is the best place
         resolution_y = int(bpy.context.scene.render.resolution_y * resolution_scale) # [pixels]
         # TODO: repeated code - END
         pixels_numpy.resize((resolution_x, resolution_y, 4))
-        print(pixels_numpy.shape)
-        print(pixels_numpy[0, 0, 3])
+        #print(pixels_numpy.shape)
+        #print(pixels_numpy[0, 0, 3])
 
 
 # registration
@@ -232,7 +238,7 @@ def register():
     # register the function being called when rendering starts
     bpy.app.handlers.render_init.append(load_handler_render_init)
     # register the function being called after rendering each frame
-    bpy.app.handlers.render_post.append(load_handler_render_frame)
+    bpy.app.handlers.render_post.append(load_handler_after_rend_frame)
 
 
 def unregister():
@@ -244,7 +250,7 @@ def unregister():
     # unregister the function being called when rendering each frame
     bpy.app.handlers.render_init.remove(load_handler_render_init)
     # unregister the function being called when rendering each frame
-    bpy.app.handlers.render_post.remove(load_handler_render_frame)
+    bpy.app.handlers.render_post.remove(load_handler_after_rend_frame)
 
 if __name__ == "__main__":
     register()
