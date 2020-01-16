@@ -230,7 +230,8 @@ def load_handler_after_rend_frame(scene): # TODO: not sure if this is the best p
         z = pixels_numpy[:, :, 3]
         normal = pixels_numpy[:, :, 0:3]
         """ Save data """
-        out_path = os.path.join(gt_dir_path, 'gt_{}.npz'.format(scene.frame_current))
+        out_path = os.path.join(gt_dir_path, '{:04d}.npz'.format(scene.frame_current))
+        print(out_path)
         np.savez_compressed(out_path,
                             intr=intrinsic_mat,
                             extr=extrinsic_mat,
