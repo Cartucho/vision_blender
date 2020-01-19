@@ -28,3 +28,8 @@ Rendering
     Render > Render Animation... or press `Ctrl + F12`
 
     You can stop and then restart! Just select again the starting frame! Uooooouu!!
+
+
+
+Blender getting the mask of the objects:
+    Object Properties > Relations > Pass Index

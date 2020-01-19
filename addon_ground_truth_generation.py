@@ -90,7 +90,7 @@ class RENDER_PT_gt_generator(GroundTruthGeneratorPanel):
     global intrinsic_mat
     bl_label = "Ground Truth Generator"
     bl_idname = "RENDER_PT_gt_generator"
-    COMPAT_ENGINES = {'BLENDER_RENDER', 'BLENDER_EEVEE', 'BLENDER_WORKBENCH'}
+    COMPAT_ENGINES = {'BLENDER_RENDER', 'BLENDER_EEVEE'}#, 'BLENDER_WORKBENCH'} # TODO: see what happens when using the WORKBENCH render
     bl_options = {'DEFAULT_CLOSED'}
 
 
@@ -162,40 +162,55 @@ classes = (
 )
 
 
-def get_viewer_node(node_name):
+def get_viewer_node(tree, node_name):
     viewer_ind = tree.nodes.find(node_name)
     if viewer_ind == -1:
         v = tree.nodes.new("CompositorNodeViewer")
         v.name = node_name
     else:
-        v = scene.node_tree.nodes[viewer_ind]
+        v = tree.nodes[viewer_ind]
     return v
 
 
 @persistent # TODO: not sure if I should be using @persistent
 def load_handler_render_init(scene):
     #print("Initializing a render job...")
+    # 1. Set-up Passes
     if not scene.use_nodes:
         scene.use_nodes = True
     if not scene.view_layers["View Layer"].use_pass_z:
         scene.view_layers["View Layer"].use_pass_z = True
     if not scene.view_layers["View Layer"].use_pass_normal:
         scene.view_layers["View Layer"].use_pass_normal = True
-
-    # check nodes
+    if scene.render.engine == 'CYCLES':
+        if not scene.view_layers["View Layer"].use_pass_object_index:
+            scene.view_layers["View Layer"].use_pass_object_index = True
+        if not scene.view_layers["View Layer"].use_pass_vector:
+            scene.view_layers["View Layer"].use_pass_vector = True
+    # 2. Set-up nodes
     tree = scene.node_tree
     rl = scene.node_tree.nodes["Render Layers"]
-    v = get_viewer_node("Viewer_normals_and_zmap")
-
-    # check links between nodes
+    v_norm_and_z = get_viewer_node(tree, "Viewer_normal_and_zmap")
+    if scene.render.engine == "CYCLES":
+        v_obj_ind = get_viewer_node(tree, "Viewer_obj_ind")
+        v_opt_flow = get_viewer_node(tree, "Viewer_opt_flow")
+    # 3. Set-up links between nodes
     ## create new links if necessary
     links = tree.links
     ## Trick: we already have the RGB image so we can connect the Normal to Image
     ##        and the Z to the Alpha channel
-    if not v.inputs["Image"].is_linked:
-        links.new(rl.outputs["Normal"], v.inputs["Image"])
-    if not v.inputs["Z"].is_linked:
-        links.new(rl.outputs["Depth"], v.inputs["Alpha"])
+    if not v_norm_and_z.inputs["Image"].is_linked:
+        links.new(rl.outputs["Normal"], v_norm_and_z.inputs["Image"])
+    if not v_norm_and_z.inputs["Alpha"].is_linked:
+        links.new(rl.outputs["Depth"], v_norm_and_z.inputs["Alpha"])
+    if scene.render.engine == "CYCLES":
+        if not v_obj_ind.inputs["Image"].is_linked:
+            links.new(rl.outputs["IndexOB"], v_obj_ind.inputs["Image"])
+        ## The optical flow needs to be connected to both `Image` and `Alpha`
+        if not v_opt_flow.inputs["Image"].is_linked:
+            links.new(rl.outputs["Vector"], v_opt_flow.inputs["Image"])
+        if not v_opt_flow.inputs["Alpha"].is_linked:
+            links.new(rl.outputs["Vector"], v_opt_flow.inputs["Alpha"])
 
 
 @persistent # TODO: not sure if I should be using @persistent
@@ -235,7 +250,7 @@ def load_handler_after_rend_frame(scene): # TODO: not sure if this is the best p
         """ Save data """
         # Blender by default assumes a padding of 4 digits
         out_path = os.path.join(gt_dir_path, '{:04d}.npz'.format(scene.frame_current))
-        print(out_path)
+        #print(out_path)
         np.savez_compressed(out_path,
                             intr=intrinsic_mat,
                             extr=extrinsic_mat,
