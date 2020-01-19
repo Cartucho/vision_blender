@@ -40,7 +40,6 @@ def get_camera_parameters_intrinsic(scene):
     """ Get intrinsic camera parameters: focal length and principal point. """
     focal_length = scene.camera.data.lens # TODO: I am assuming [mm]
     res_x, res_y = get_scene_resolution(scene)
-
     sensor_width = scene.camera.data.sensor_width # [mm]
     sensor_height = scene.camera.data.sensor_height # [mm]
     ### f_x
@@ -61,7 +60,6 @@ def get_camera_parameters_intrinsic(scene):
     ### c_y
     shift_y = scene.camera.data.shift_y # [mm]
     c_y = (res_y - 1) /2.0 #+ shift_pixels_y [pixels] TODO: shift_y to pixel
-
     return f_x, f_y, c_x, c_y
 
 
@@ -164,10 +162,19 @@ classes = (
 )
 
 
+def get_viewer_node(node_name):
+    viewer_ind = tree.nodes.find(node_name)
+    if viewer_ind == -1:
+        v = tree.nodes.new("CompositorNodeViewer")
+        v.name = node_name
+    else:
+        v = scene.node_tree.nodes[viewer_ind]
+    return v
+
+
 @persistent # TODO: not sure if I should be using @persistent
 def load_handler_render_init(scene):
-    print("Initialization of a render job")
-
+    #print("Initializing a render job...")
     if not scene.use_nodes:
         scene.use_nodes = True
     if not scene.view_layers["View Layer"].use_pass_z:
@@ -175,24 +182,20 @@ def load_handler_render_init(scene):
     if not scene.view_layers["View Layer"].use_pass_normal:
         scene.view_layers["View Layer"].use_pass_normal = True
 
-    # check connections
+    # check nodes
     tree = scene.node_tree
     rl = scene.node_tree.nodes["Render Layers"]
-    v = None
-    viewer_ind = tree.nodes.find("Viewer")
-    if viewer_ind == -1:
-        v = tree.nodes.new("CompositorNodeViewer")
-    else:
-        v = scene.node_tree.nodes[viewer_ind]
+    v = get_viewer_node("Viewer_normals_and_zmap")
 
-    # create new links if necessary
+    # check links between nodes
+    ## create new links if necessary
     links = tree.links
-    # Trick: we already have the RGB image so we can connect the Normal to Image
-    #        and the Z to the Alpha channel
+    ## Trick: we already have the RGB image so we can connect the Normal to Image
+    ##        and the Z to the Alpha channel
     if not v.inputs["Image"].is_linked:
-        links.new(rl.outputs["Normal"], v.inputs["Image"])  # link Render Normals to Viewer Image
+        links.new(rl.outputs["Normal"], v.inputs["Image"])
     if not v.inputs["Z"].is_linked:
-        links.new(rl.outputs["Depth"], v.inputs["Alpha"]) # link Render Z to Viewer Alpha
+        links.new(rl.outputs["Depth"], v.inputs["Alpha"])
 
 
 @persistent # TODO: not sure if I should be using @persistent
@@ -230,6 +233,7 @@ def load_handler_after_rend_frame(scene): # TODO: not sure if this is the best p
         z = pixels_numpy[:, :, 3]
         normal = pixels_numpy[:, :, 0:3]
         """ Save data """
+        # Blender by default assumes a padding of 4 digits
         out_path = os.path.join(gt_dir_path, '{:04d}.npz'.format(scene.frame_current))
         print(out_path)
         np.savez_compressed(out_path,
@@ -238,6 +242,7 @@ def load_handler_after_rend_frame(scene): # TODO: not sure if this is the best p
                             z_map=z,
                             normal_map=normal
                            )
+        # ref: https://stackoverflow.com/questions/35133317/numpy-save-some-arrays-at-once
 
 
 # registration
