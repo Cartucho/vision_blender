@@ -162,13 +162,13 @@ classes = (
 )
 
 
-def get_viewer_node(tree, node_name):
-    viewer_ind = tree.nodes.find(node_name)
-    if viewer_ind == -1:
-        v = tree.nodes.new("CompositorNodeViewer")
+def get_node(tree, node_type, node_name):
+    node_ind = tree.nodes.find(node_name)
+    if node_ind == -1:
+        v = tree.nodes.new(node_type)
         v.name = node_name
     else:
-        v = tree.nodes[viewer_ind]
+        v = tree.nodes[node_ind]
     return v
 
 
@@ -182,39 +182,46 @@ def load_handler_render_init(scene):
         scene.view_layers["View Layer"].use_pass_z = True
     if not scene.view_layers["View Layer"].use_pass_normal:
         scene.view_layers["View Layer"].use_pass_normal = True
+
     if scene.render.engine == 'CYCLES':
         if not scene.view_layers["View Layer"].use_pass_object_index:
             scene.view_layers["View Layer"].use_pass_object_index = True
         if not scene.view_layers["View Layer"].use_pass_vector:
             scene.view_layers["View Layer"].use_pass_vector = True
+
     # 2. Set-up nodes
     tree = scene.node_tree
     rl = scene.node_tree.nodes["Render Layers"]
-    v_norm_and_z = get_viewer_node(tree, "Viewer_normal_and_zmap")
+    node_norm_and_z = get_node(tree, "CompositorNodeViewer", "normal_and_zmap")
+
     if scene.render.engine == "CYCLES":
-        v_obj_ind = get_viewer_node(tree, "Viewer_obj_ind")
-        v_opt_flow = get_viewer_node(tree, "Viewer_opt_flow")
+        node_obj_ind = get_node(tree, "CompositorNodeOutputFile", "obj_ind")
+        node_opt_flow = get_node(tree, "CompositorNodeOutputFile", "opt_flow")
+        path_render = scene.render.filepath
+        node_obj_ind.base_path = os.path.join(path_render, "obj_ind_mask/")
+        print(node_obj_ind.base_path)
+        node_opt_flow.base_path = os.path.join(path_render, "vector/")
+
     # 3. Set-up links between nodes
     ## create new links if necessary
     links = tree.links
     ## Trick: we already have the RGB image so we can connect the Normal to Image
     ##        and the Z to the Alpha channel
-    if not v_norm_and_z.inputs["Image"].is_linked:
-        links.new(rl.outputs["Normal"], v_norm_and_z.inputs["Image"])
-    if not v_norm_and_z.inputs["Alpha"].is_linked:
-        links.new(rl.outputs["Depth"], v_norm_and_z.inputs["Alpha"])
+    if not node_norm_and_z.inputs["Image"].is_linked:
+        links.new(rl.outputs["Normal"], node_norm_and_z.inputs["Image"])
+    if not node_norm_and_z.inputs["Alpha"].is_linked:
+        links.new(rl.outputs["Depth"], node_norm_and_z.inputs["Alpha"])
+
     if scene.render.engine == "CYCLES":
-        if not v_obj_ind.inputs["Image"].is_linked:
-            links.new(rl.outputs["IndexOB"], v_obj_ind.inputs["Image"])
+        if not node_obj_ind.inputs["Image"].is_linked:
+            links.new(rl.outputs["IndexOB"], node_obj_ind.inputs["Image"])
         ## The optical flow needs to be connected to both `Image` and `Alpha`
-        if not v_opt_flow.inputs["Image"].is_linked:
-            links.new(rl.outputs["Vector"], v_opt_flow.inputs["Image"])
-        if not v_opt_flow.inputs["Alpha"].is_linked:
-            links.new(rl.outputs["Vector"], v_opt_flow.inputs["Alpha"])
+        if not node_opt_flow.inputs["Image"].is_linked:
+            links.new(rl.outputs["Vector"], node_opt_flow.inputs["Image"])
 
 
 @persistent # TODO: not sure if I should be using @persistent
-def load_handler_after_rend_frame(scene): # TODO: not sure if this is the best place to put this
+def load_handler_after_rend_frame(scene): # TODO: not sure if this is the best place to put this function, should it be above the classes?
     """ This script runs after rendering each frame """
     # ref: https://blenderartists.org/t/how-to-run-script-on-every-frame-in-blender-render/699404/2
     # check if user wants to generate the ground truth data
@@ -233,63 +240,31 @@ def load_handler_after_rend_frame(scene): # TODO: not sure if this is the best p
                                   [0, f_y, c_y],
                                   [0,   0,   1]])
         """ Zmap + Normal """
-        tree = scene.node_tree
-        ## select node
-        tmp_v = tree.nodes["Viewer_normal_and_zmap"]
-        tmp_v.select = True
-        tree.nodes.active = tmp_v
         ## get data
-        pixels_1 = bpy.data.images['Viewer Node'].pixels
-        #print(len(pixels_1)) # size = width * height * 4 (rgba)
-        pixels_numpy_normal_and_z = np.array(pixels_1[:])
+        pixels = bpy.data.images['Viewer Node'].pixels
+        #print(len(pixels)) # size = width * height * 4 (rgba)
+        pixels_numpy = np.array(pixels[:])
         res_x, res_y = get_scene_resolution(scene)
         #   .---> y
         #   |
         #   |
         #   v
         #    x
-        pixels_numpy_normal_and_z.resize((res_y, res_x, 4)) # Numpy works with (y, x, channels)
-        normal = pixels_numpy_normal_and_z[:, :, 0:3]
+        pixels_numpy.resize((res_y, res_x, 4)) # Numpy works with (y, x, channels)
+        normal = pixels_numpy[:, :, 0:3]
         print("Normal:")
         print(normal[567, 1020])
-        z = pixels_numpy_normal_and_z[:, :, 3]
-        """ Object index (for CYCLES render only) """
-        # TODO: repeating code START
-        ## select node
-        print(tree.nodes.active)
-        if scene.render.engine == "CYCLES":
-            tmp_v = tree.nodes["Viewer_obj_ind"]
-            tmp_v.select = True
-            tree.nodes.active = tmp_v
-            print(tree.nodes.active)
-            ## get data
-            pixels_2 = bpy.data.images['Viewer Node'].pixels
-            #print(len(pixels_2)) # size = width * height * 4 (rgba)
-            pixels_numpy = np.array(pixels_2[:])
-            pixels_numpy.resize((res_y, res_x, 4)) # Numpy works with (y, x, channels)
-            obj_ind = pixels_numpy[:, :, 0:3]
-            print("Obj ind:")
-            print(obj_ind[567, 1020])
-        # TODO: repeating code END
+        z = pixels_numpy[:, :, 3]
         """ Save data """
         # Blender by default assumes a padding of 4 digits
         out_path = os.path.join(gt_dir_path, '{:04d}.npz'.format(scene.frame_current))
         #print(out_path)
-        if scene.render.engine == "CYCLES":
-            np.savez_compressed(out_path,
-                                intr=intrinsic_mat,
-                                extr=extrinsic_mat,
-                                normal_map=normal,
-                                z_map=z,
-                                obj_mask=obj_ind
-                               )
-        else:
-            np.savez_compressed(out_path,
-                                intr=intrinsic_mat,
-                                extr=extrinsic_mat,
-                                normal_map=normal,
-                                z_map=z
-                               )
+        np.savez_compressed(out_path,
+                            intr=intrinsic_mat,
+                            extr=extrinsic_mat,
+                            normal_map=normal,
+                            z_map=z
+                           )
         # ref: https://stackoverflow.com/questions/35133317/numpy-save-some-arrays-at-once
 
 
