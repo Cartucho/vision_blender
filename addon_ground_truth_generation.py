@@ -233,30 +233,63 @@ def load_handler_after_rend_frame(scene): # TODO: not sure if this is the best p
                                   [0, f_y, c_y],
                                   [0,   0,   1]])
         """ Zmap + Normal """
-        pixels = bpy.data.images['Viewer Node'].pixels
-        #print(len(pixels)) # size = width * height * 4 (rgba)
-        pixels_numpy = np.array(pixels[:])
+        tree = scene.node_tree
+        ## select node
+        tmp_v = tree.nodes["Viewer_normal_and_zmap"]
+        tmp_v.select = True
+        tree.nodes.active = tmp_v
+        ## get data
+        pixels_1 = bpy.data.images['Viewer Node'].pixels
+        #print(len(pixels_1)) # size = width * height * 4 (rgba)
+        pixels_numpy_normal_and_z = np.array(pixels_1[:])
         res_x, res_y = get_scene_resolution(scene)
-        """
-           .---> y
-           |
-           |
-           v
-            x
-        """
-        pixels_numpy.resize((res_y, res_x, 4)) # Numpy works with (y, x, channels)
-        z = pixels_numpy[:, :, 3]
-        normal = pixels_numpy[:, :, 0:3]
+        #   .---> y
+        #   |
+        #   |
+        #   v
+        #    x
+        pixels_numpy_normal_and_z.resize((res_y, res_x, 4)) # Numpy works with (y, x, channels)
+        normal = pixels_numpy_normal_and_z[:, :, 0:3]
+        print("Normal:")
+        print(normal[567, 1020])
+        z = pixels_numpy_normal_and_z[:, :, 3]
+        """ Object index (for CYCLES render only) """
+        # TODO: repeating code START
+        ## select node
+        print(tree.nodes.active)
+        if scene.render.engine == "CYCLES":
+            tmp_v = tree.nodes["Viewer_obj_ind"]
+            tmp_v.select = True
+            tree.nodes.active = tmp_v
+            print(tree.nodes.active)
+            ## get data
+            pixels_2 = bpy.data.images['Viewer Node'].pixels
+            #print(len(pixels_2)) # size = width * height * 4 (rgba)
+            pixels_numpy = np.array(pixels_2[:])
+            pixels_numpy.resize((res_y, res_x, 4)) # Numpy works with (y, x, channels)
+            obj_ind = pixels_numpy[:, :, 0:3]
+            print("Obj ind:")
+            print(obj_ind[567, 1020])
+        # TODO: repeating code END
         """ Save data """
         # Blender by default assumes a padding of 4 digits
         out_path = os.path.join(gt_dir_path, '{:04d}.npz'.format(scene.frame_current))
         #print(out_path)
-        np.savez_compressed(out_path,
-                            intr=intrinsic_mat,
-                            extr=extrinsic_mat,
-                            z_map=z,
-                            normal_map=normal
-                           )
+        if scene.render.engine == "CYCLES":
+            np.savez_compressed(out_path,
+                                intr=intrinsic_mat,
+                                extr=extrinsic_mat,
+                                normal_map=normal,
+                                z_map=z,
+                                obj_mask=obj_ind
+                               )
+        else:
+            np.savez_compressed(out_path,
+                                intr=intrinsic_mat,
+                                extr=extrinsic_mat,
+                                normal_map=normal,
+                                z_map=z
+                               )
         # ref: https://stackoverflow.com/questions/35133317/numpy-save-some-arrays-at-once
 
 
