@@ -36,30 +36,43 @@ def get_scene_resolution(scene):
     return int(resolution_x), int(resolution_y)
 
 
+def get_sensor_size(sensor_fit, sensor_x, sensor_y):
+    if sensor_fit == 'VERTICAL':
+        return sensor_y
+    return sensor_x
+
+
+def get_sensor_fit(sensor_fit, size_x, size_y):
+    if sensor_fit == 'AUTO':
+        if size_x >= size_y:
+            return 'HORIZONTAL'
+        else:
+            return 'VERTICAL'
+    return sensor_fit
+
+
 def get_camera_parameters_intrinsic(scene):
     """ Get intrinsic camera parameters: focal length and principal point. """
-    focal_length = scene.camera.data.lens # TODO: I am assuming [mm]
+    # ref: https://blender.stackexchange.com/questions/38009/3x4-camera-matrix-from-blender-camera/120063#120063
+    focal_length = scene.camera.data.lens # [mm]
     res_x, res_y = get_scene_resolution(scene)
-    sensor_width = scene.camera.data.sensor_width # [mm]
-    sensor_height = scene.camera.data.sensor_height # [mm]
-    ### f_x
-    f_x = focal_length * (res_x / sensor_width) # [pixels]
-    ### f_y
-    f_y = focal_length * (res_y / sensor_height) # [pixels]
-    scale_x = scene.render.pixel_aspect_x
-    scale_y = scene.render.pixel_aspect_y
-    pixel_aspect_ratio = scale_x / scale_y
-    if pixel_aspect_ratio != 1.0:
-        if scene.camera.data.sensor_fit == 'VERTICAL':
-            f_x = f_x / pixel_aspect_ratio
-        else:
-            f_y = f_y * pixel_aspect_ratio  
-    ### c_x
-    shift_x = scene.camera.data.shift_x # [mm]
-    c_x = (res_x - 1) / 2.0 #+ shift_pixels_x [pixels] TODO: shift_x to pixel
-    ### c_y
-    shift_y = scene.camera.data.shift_y # [mm]
-    c_y = (res_y - 1) /2.0 #+ shift_pixels_y [pixels] TODO: shift_y to pixel
+    cam_data = scene.camera.data
+    sensor_size_in_mm = get_sensor_size(cam_data.sensor_fit, cam_data.sensor_width, cam_data.sensor_height)
+    sensor_fit = get_sensor_fit(
+        cam_data.sensor_fit,
+        scene.render.pixel_aspect_x * res_x,
+        scene.render.pixel_aspect_y * res_y
+    )
+    pixel_aspect_ratio = scene.render.pixel_aspect_y / scene.render.pixel_aspect_x
+    if sensor_fit == 'HORIZONTAL':
+        view_fac_in_px = res_x
+    else:
+        view_fac_in_px = pixel_aspect_ratio * res_y
+    pixel_size_mm_per_px = sensor_size_in_mm / focal_length / view_fac_in_px
+    f_x = 1.0 / pixel_size_mm_per_px
+    f_y = 1.0 / pixel_size_mm_per_px / pixel_aspect_ratio
+    c_x = (res_x - 1) / 2.0 - cam_data.shift_x * view_fac_in_px
+    c_y = (res_y - 1) / 2.0 + cam_data.shift_y * view_fac_in_px / pixel_aspect_ratio
     return f_x, f_y, c_x, c_y
 
 
