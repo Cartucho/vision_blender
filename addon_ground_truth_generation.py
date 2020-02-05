@@ -76,6 +76,52 @@ def get_camera_parameters_intrinsic(scene):
     return f_x, f_y, c_x, c_y
 
 
+def get_camera_parameters_extrinsic(scene):
+    """ Get extrinsic camera parameters. 
+    
+      There are 3 coordinate systems involved:
+         1. The World coordinates: "world"
+            - right-handed
+         2. The Blender camera coordinates: "bcam"
+            - x is horizontal
+            - y is up
+            - right-handed: negative z look-at direction
+         3. The desired computer vision camera coordinates: "cv"
+            - x is horizontal
+            - y is down (to align to the actual pixel coordinates 
+               used in digital images)
+            - right-handed: positive z look-at direction
+
+      ref: https://blender.stackexchange.com/questions/38009/3x4-camera-matrix-from-blender-camera
+    """
+    # bcam stands for blender camera
+    bcam = scene.camera
+    R_bcam2cv = np.array([[1,  0,  0],
+                          [0, -1,  0],
+                          [0,  0, -1]])
+
+    # Transpose since the rotation is object rotation, 
+    # and we want coordinate rotation
+    # R_world2bcam = cam.rotation_euler.to_matrix().transposed()
+    # T_world2bcam = -1*R_world2bcam * location
+    #
+    # Use matrix_world instead to account for all constraints
+    location = np.array([bcam.matrix_world.decompose()[0]]).T
+    R_world2bcam = np.array(bcam.matrix_world.decompose()[1].to_matrix().transposed())
+
+    # Convert camera location to translation vector used in coordinate changes
+    # T_world2bcam = -1*R_world2bcam*bcam.location
+    # Use location from matrix_world to account for constraints:
+    T_world2bcam = np.matmul(R_world2bcam.dot(-1), location)
+
+    # Build the coordinate transform matrix from world to computer vision camera
+    R_world2cv = np.matmul(R_bcam2cv, R_world2bcam)
+    T_world2cv = np.matmul(R_bcam2cv, T_world2bcam)
+
+    extr = np.concatenate((R_world2cv, T_world2cv), axis=1)
+    return extr
+
+
 # classes
 class MyAddonProperties(PropertyGroup):
     # boolean to choose between saving ground truth data or not
@@ -113,6 +159,7 @@ class RENDER_PT_gt_generator(GroundTruthGeneratorPanel):
 
 
     def draw(self, context):
+        scene = context.scene
         layout = self.layout
         layout.active = context.scene.my_addon.save_gt_data
 
@@ -122,7 +169,7 @@ class RENDER_PT_gt_generator(GroundTruthGeneratorPanel):
         # Get camera parameters
         """ show intrinsic parameters """
         layout.label(text="Intrinsic parameters [pixels]:")
-        f_x, f_y, c_x, c_y = get_camera_parameters_intrinsic(context.scene)
+        f_x, f_y, c_x, c_y = get_camera_parameters_intrinsic(scene)
 
         box_intr = self.layout.box()
         col_intr = box_intr.column()
@@ -145,28 +192,28 @@ class RENDER_PT_gt_generator(GroundTruthGeneratorPanel):
         """ show extrinsic parameters """
         layout.label(text="Extrinsic parameters [pixels]:")
 
-        cam_mat_world = context.scene.camera.matrix_world.inverted()
-        
+        extr = get_camera_parameters_extrinsic(scene)
+
         box_ext = self.layout.box()
         col_ext = box_ext.column()
 
         row_ext_0 = col_ext.split()
-        row_ext_0.label(text=str(cam_mat_world[0][0]))
-        row_ext_0.label(text=str(cam_mat_world[0][1]))
-        row_ext_0.label(text=str(cam_mat_world[0][2]))
-        row_ext_0.label(text=str(cam_mat_world[0][3]))
+        row_ext_0.label(text=str(extr[0, 0]))
+        row_ext_0.label(text=str(extr[0, 1]))
+        row_ext_0.label(text=str(extr[0, 2]))
+        row_ext_0.label(text=str(extr[0, 3]))
 
         row_ext_1 = col_ext.split()
-        row_ext_1.label(text=str(cam_mat_world[1][0]))
-        row_ext_1.label(text=str(cam_mat_world[1][1]))
-        row_ext_1.label(text=str(cam_mat_world[1][2]))
-        row_ext_1.label(text=str(cam_mat_world[1][3]))
+        row_ext_1.label(text=str(extr[1, 0]))
+        row_ext_1.label(text=str(extr[1, 1]))
+        row_ext_1.label(text=str(extr[1, 2]))
+        row_ext_1.label(text=str(extr[1, 3]))
 
         row_ext_2 = col_ext.split()
-        row_ext_2.label(text=str(cam_mat_world[2][0]))
-        row_ext_2.label(text=str(cam_mat_world[2][1]))
-        row_ext_2.label(text=str(cam_mat_world[2][2]))
-        row_ext_2.label(text=str(cam_mat_world[2][3]))
+        row_ext_2.label(text=str(extr[2, 0]))
+        row_ext_2.label(text=str(extr[2, 1]))
+        row_ext_2.label(text=str(extr[2, 2]))
+        row_ext_2.label(text=str(extr[2, 3]))
 
 classes = (
     RENDER_PT_gt_generator,
@@ -245,8 +292,7 @@ def load_handler_after_rend_frame(scene): # TODO: not sure if this is the best p
         #print(scene.frame_current)
         """ Camera parameters """
         ### extrinsic
-        cam_mat_world = bpy.context.scene.camera.matrix_world.inverted()
-        extrinsic_mat = np.array(cam_mat_world)
+        extrinsic_mat = get_camera_parameters_extrinsic(scene)
         ### intrinsic
         f_x, f_y, c_x, c_y = get_camera_parameters_intrinsic(scene)
         intrinsic_mat = np.array([[f_x, 0, c_x],
