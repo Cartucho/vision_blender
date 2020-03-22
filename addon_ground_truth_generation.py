@@ -291,6 +291,8 @@ def load_handler_after_rend_frame(scene): # TODO: not sure if this is the best p
         # save ground truth data
         #print(scene.frame_current)
         """ Camera parameters """
+        ## update camera - ref: https://blender.stackexchange.com/questions/5636/how-can-i-get-the-location-of-an-object-at-each-keyframe
+        scene.frame_set(scene.frame_current) # needed to update the camera position
         ### extrinsic
         extrinsic_mat = get_camera_parameters_extrinsic(scene)
         ### intrinsic
