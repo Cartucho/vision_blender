@@ -12,9 +12,11 @@ bl_info = {
         "category":"Render"
     }
 
-import bpy
+import json
 import os
 import numpy as np # TODO: check if Blender has numpy by default
+
+import bpy
 from bpy.props import (StringProperty, # TODO: not being used
                    BoolProperty,
                    IntProperty, # TODO: not being used
@@ -279,6 +281,46 @@ def load_handler_render_init(scene):
         if not node_opt_flow.inputs["Image"].is_linked:
             links.new(rl.outputs["Vector"], node_opt_flow.inputs["Image"])
 
+    # 4. Save camera_info
+    dict_cam_info = {}
+    render = scene.render
+    cam = scene.camera
+    ## img file format
+    dict_cam_info['img_format'] = render.image_settings.file_format
+    ## camera image resolution
+    res_x, res_y = get_scene_resolution(scene)
+    dict_cam_info['img_res_x'] = res_x
+    dict_cam_info['img_res_y'] = res_y
+    ## camera intrinsic matrix parameters
+    cam_mat_intr = {}
+    f_x, f_y, c_x, c_y = get_camera_parameters_intrinsic(scene)
+    cam_mat_intr['f_x'] = f_x
+    cam_mat_intr['f_y'] = f_y
+    cam_mat_intr['c_x'] = c_x
+    cam_mat_intr['c_y'] = c_y
+    dict_cam_info['cam_mat_intr'] = cam_mat_intr
+    ## is_stereo
+    is_stereo = render.use_multiview
+    dict_cam_info['is_stereo'] = is_stereo
+    if is_stereo:
+        stereo_info = {}
+        ### left camera file suffix
+        stereo_info['stereo_left_suffix'] = render.views["left"].file_suffix
+        ### right camera file suffix
+        stereo_info['stereo_right_suffix'] = render.views["right"].file_suffix
+        ### stereo mode
+        stereo_info['stereo_mode'] = cam.data.stereo.convergence_mode
+        ### stereo interocular distance
+        stereo_info['stereo_interocular_distance'] = cam.data.stereo.interocular_distance
+        ### stereo pivot
+        stereo_info['stereo_pivot'] = cam.data.stereo.pivot
+        dict_cam_info['stereo_info'] = stereo_info
+    ## save data to a json file
+    gt_dir_path = scene.render.filepath
+    out_path = os.path.join(gt_dir_path, 'camera_info.json')
+    with open(out_path, 'w') as tmp_file:
+        json.dump(dict_cam_info, tmp_file)
+
 
 @persistent # TODO: not sure if I should be using @persistent
 def load_handler_after_rend_frame(scene): # TODO: not sure if this is the best place to put this function, should it be above the classes?
@@ -297,9 +339,6 @@ def load_handler_after_rend_frame(scene): # TODO: not sure if this is the best p
         extrinsic_mat = get_camera_parameters_extrinsic(scene)
         ### intrinsic
         f_x, f_y, c_x, c_y = get_camera_parameters_intrinsic(scene)
-        intrinsic_mat = np.array([[f_x, 0, c_x],
-                                  [0, f_y, c_y],
-                                  [0,   0,   1]])
         """ Zmap + Normal """
         ## get data
         pixels = bpy.data.images['Viewer Node'].pixels
@@ -321,7 +360,6 @@ def load_handler_after_rend_frame(scene): # TODO: not sure if this is the best p
         out_path = os.path.join(gt_dir_path, '{:04d}.npz'.format(scene.frame_current))
         #print(out_path)
         np.savez_compressed(out_path,
-                            intr=intrinsic_mat,
                             extr=extrinsic_mat,
                             normal_map=normal,
                             z_map=z
