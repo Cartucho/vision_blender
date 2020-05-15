@@ -70,11 +70,11 @@ def get_camera_parameters_intrinsic(scene):
         view_fac_in_px = res_x
     else:
         view_fac_in_px = pixel_aspect_ratio * res_y
-    pixel_size_mm_per_px = sensor_size_in_mm / focal_length / view_fac_in_px
+    pixel_size_mm_per_px = (sensor_size_in_mm / focal_length) / view_fac_in_px
     f_x = 1.0 / pixel_size_mm_per_px
-    f_y = 1.0 / pixel_size_mm_per_px / pixel_aspect_ratio
+    f_y = (1.0 / pixel_size_mm_per_px) / pixel_aspect_ratio
     c_x = (res_x - 1) / 2.0 - cam_data.shift_x * view_fac_in_px
-    c_y = (res_y - 1) / 2.0 + cam_data.shift_y * view_fac_in_px / pixel_aspect_ratio
+    c_y = (res_y - 1) / 2.0 + (cam_data.shift_y * view_fac_in_px) / pixel_aspect_ratio
     return f_x, f_y, c_x, c_y
 
 
@@ -124,6 +124,16 @@ def get_camera_parameters_extrinsic(scene):
     return extr
 
 
+def correct_cycles_depth(z_map, res_x, res_y, f_x, f_y, c_x, c_y):
+    for y in range(res_y):
+        b = ((c_y - y) / f_y)**2
+        for x in range(res_x):
+            a = ((c_x - x) / f_x)**2
+            new_value = z_map[y][x] / np.sqrt(1 + a + b)
+            z_map[y][x] = new_value
+    return z_map
+
+
 # classes
 class MyAddonProperties(PropertyGroup):
     # boolean to choose between saving ground truth data or not
@@ -151,7 +161,7 @@ class RENDER_PT_gt_generator(GroundTruthGeneratorPanel):
     global intrinsic_mat
     bl_label = "Ground Truth Generator"
     bl_idname = "RENDER_PT_gt_generator"
-    COMPAT_ENGINES = {'BLENDER_RENDER', 'BLENDER_EEVEE'}#, 'BLENDER_WORKBENCH'} # TODO: see what happens when using the WORKBENCH render
+    COMPAT_ENGINES = {'BLENDER_EEVEE', 'BLENDER_CYCLES'}#, 'BLENDER_WORKBENCH' # TODO: see what happens when using the WORKBENCH render
     bl_options = {'DEFAULT_CLOSED'}
 
 
@@ -355,6 +365,8 @@ def load_handler_after_rend_frame(scene): # TODO: not sure if this is the best p
         print("Normal:")
         print(normal[567, 1020])
         z = pixels_numpy[:, :, 3]
+        if scene.render.engine == "CYCLES":
+            z = correct_cycles_depth(z, res_x, res_y, f_x, f_y, c_x, c_y)
         """ Save data """
         # Blender by default assumes a padding of 4 digits
         out_path = os.path.join(gt_dir_path, '{:04d}.npz'.format(scene.frame_current))
