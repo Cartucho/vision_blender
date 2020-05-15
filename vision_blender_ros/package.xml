@@ -1,0 +1,28 @@
+<?xml version="1.0"?>
+<package format="2">
+  <name>vision_blender_ros</name>
+  <version>0.0.0</version>
+  <description>The vision_blender_ros package for creating a rosbag with data from Blender</description>
+
+  <maintainer email="joaocartuchoo@gmail.com">Joao Cartucho</maintainer>
+  <license>Apache 2.0</license>
+  <url type="website">https://github.com/Cartucho/vision_blender</url>
+  <author email="joaocartuchoo@gmail.com">Joao Cartucho</author>
+
+  <buildtool_depend>catkin</buildtool_depend>
+  <build_depend>roscpp</build_depend>
+  <build_depend>rospy</build_depend>
+  <build_depend>std_msgs</build_depend>
+  <build_depend>cv_bridge</build_depend>
+  <build_depend>tf2</build_depend>
+  <build_export_depend>roscpp</build_export_depend>
+  <build_export_depend>rospy</build_export_depend>
+  <build_export_depend>std_msgs</build_export_depend>
+  <build_export_depend>cv_bridge</build_export_depend>
+  <build_export_depend>tf2</build_export_depend>
+  <exec_depend>roscpp</exec_depend>
+  <exec_depend>rospy</exec_depend>
+  <exec_depend>std_msgs</exec_depend>
+  <exec_depend>cv_bridge</exec_depend>
+  <exec_depend>tf2</exec_depend>
+</package>

@@ -1,0 +1,5 @@
+<launch>
+  <node pkg="vision_blender_ros" name="vision_blender_create_bag" type="vision_blender_create_bag.py" output="screen">
+    <rosparam command="load" subst_value="true" file="$(find vision_blender_ros)/config/settings.yaml" />
+  </node>
+</launch>

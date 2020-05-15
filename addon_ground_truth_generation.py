@@ -2,9 +2,9 @@
 bl_info = {
         "name":"Ground Truth Generation",
         "description":"Generate ground truth data (e.g., depth map) for Computer Vision applications.",
-        "author":"Joao Cartucho, YP Li",
+        "author":"Joao Cartucho",
         "version":(1, 0),
-        "blender":(2, 81, 16),
+        "blender":(2, 82, 7),
         "location":"PROPERTIES",
         "warning":"", # used for warning icon and text in addons panel
         "wiki_url":"",

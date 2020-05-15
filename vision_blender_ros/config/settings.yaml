@@ -1,0 +1,15 @@
+# ROSBAG config
+hz: 20
+data_dir_path: '$(find vision_blender_ros)/data/'
+rosbag_name: 'vision_blender_gt.bag'
+# ROSBAG config - rostopics
+camera_frame_id: '/camera_link'
+## for monocular camera
+#topic_name_monoc_rgb: 'camera/rgb/image_raw'
+#topic_name_monoc_depth: 'camera/depth/image_raw'
+## for stereo data
+topic_name_stereo_left_rgb: '/stereo/left/image_rect' #'camera/left/rgb/image_raw'
+topic_name_stereo_left_cam_info: '/stereo/left/camera_info' #'camera/left/rgb/camera_info'
+#topic_name_stereo_left_depth: 'camera/left/depth/image_raw' # the left camera is the pivot
+topic_name_stereo_right_rgb: '/stereo/right/image_rect' #'camera/right/rgb/image_raw'
+topic_name_stereo_right_cam_info: '/stereo/right/camera_info' #'camera/right/rgb/camera_info'

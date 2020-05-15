@@ -1,4 +1,4 @@
-# BlenderVision
+# vision_blender
 A Blender addon to generate synthetic ground truth data (benchmarks) for Computer Vision applications.
 
 
@@ -33,3 +33,32 @@ Rendering
 
 Blender getting the mask of the objects:
     Object Properties > Relations > Pass Index
+
+
+
+## ROS
+
+Stereo data must use the standard naming img_L and img_R
+
+Install `cv_bridge` on your computer:
+
+  sudo apt-get install ros-kinetic-cv-bridge
+
+Link folder to catkin_ws:
+
+ln -s ~/dev/vision_blender/vision_blender_ros ~/catkin_ws/src/
+
+
+install catkin_pkg in python:
+#. conda activate
+#. conda install -c conda-forge catkin_pkg
+#. which python
+
+    save that path and then build the ROS package
+
+e.g.: `catkin build vision_blender_ros -DPYTHON_EXECUTABLE=/home/tribta/dev/miniconda3/bin/python`
+
+launch is for publishing data
+rosrun cpp example is an example for how people can read it in C++
+
+since we want the user to be able to control the frame rate then we create a rosba with the data
