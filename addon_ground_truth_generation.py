@@ -126,10 +126,10 @@ def get_camera_parameters_extrinsic(scene):
 
 def correct_cycles_depth(z_map, res_x, res_y, f_x, f_y, c_x, c_y):
     for y in range(res_y):
-        b = ((c_y - y) / f_y)**2
+        b = ((c_y - y) / f_y)
         for x in range(res_x):
-            a = ((c_x - x) / f_x)**2
-            new_value = z_map[y][x] / np.sqrt(1 + a + b)
+            a = ((c_x - x) / f_x)
+            new_value = z_map[y][x] / np.linalg.norm([1, a, b])
             z_map[y][x] = new_value
     return z_map
 
