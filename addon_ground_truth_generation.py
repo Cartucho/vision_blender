@@ -143,6 +143,11 @@ class MyAddonProperties(PropertyGroup):
         description = "Save ground truth data",
         default = True,
         )
+    bool_save_depth : BoolProperty(
+        name="Depth",
+        description="Save depth data",
+        default = False
+        )
 
 
 class GroundTruthGeneratorPanel(Panel):
@@ -168,11 +173,20 @@ class RENDER_PT_gt_generator(GroundTruthGeneratorPanel):
 
     def draw(self, context):
         scene = context.scene
+        my_addon = scene.my_addon
         layout = self.layout
-        layout.active = context.scene.my_addon.bool_save_gt_data
+        layout.active = my_addon.bool_save_gt_data
 
         layout.use_property_split = False
         layout.use_property_decorate = False  # No animation.
+
+        """ testing a bool """
+        layout.prop(my_addon, "bool_save_depth", text="Bool Property")
+        # check if bool property is enabled
+        if (my_addon.bool_save_depth == True):
+            print ("Save depth Enabled")
+        else:
+            print ("Save depth Disabled")
 
         # Get camera parameters
         """ show intrinsic parameters """
