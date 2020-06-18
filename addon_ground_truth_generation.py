@@ -145,11 +145,6 @@ class MyAddonProperties(PropertyGroup):
         )
 
 
-#class RENDER_OT_save_gt_data(bpy.types.Operator):
-#    """ Saves the ground truth data that was created with the add-on """
-#    bl_label = "Save ground truth data"
-#    bl_idname = "RENDER_OT_" # How Blender refers to this operator
-
 class GroundTruthGeneratorPanel(Panel):
     """Creates a Panel in the Output properties window for exporting ground truth data"""
     bl_space_type = 'PROPERTIES'
@@ -231,7 +226,6 @@ class RENDER_PT_gt_generator(GroundTruthGeneratorPanel):
 classes = (
     RENDER_PT_gt_generator,
     MyAddonProperties,
-    #RENDER_OT_save_gt_data
 )
 
 
