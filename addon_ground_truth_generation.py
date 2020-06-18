@@ -295,101 +295,103 @@ def get_or_create_node(tree, node_type, node_name):
 
 @persistent # TODO: not sure if I should be using @persistent
 def load_handler_render_init(scene):
-    #print("Initializing a render job...")
-    # 1. Set-up Passes
-    if not scene.use_nodes:
-        scene.use_nodes = True
-    if not scene.view_layers["View Layer"].use_pass_z:
-        scene.view_layers["View Layer"].use_pass_z = True
-    if not scene.view_layers["View Layer"].use_pass_normal:
-        scene.view_layers["View Layer"].use_pass_normal = True
-    if scene.render.engine == 'CYCLES':
-        if not scene.view_layers["View Layer"].use_pass_object_index:
-            scene.view_layers["View Layer"].use_pass_object_index = True
-        if not scene.view_layers["View Layer"].use_pass_vector:
-            scene.view_layers["View Layer"].use_pass_vector = True
+    # check if user wants to generate the ground truth data
+    if scene.my_addon.bool_save_gt_data:
+        #print("Initializing a render job...")
+        # 1. Set-up Passes
+        if not scene.use_nodes:
+            scene.use_nodes = True
+        if not scene.view_layers["View Layer"].use_pass_z:
+            scene.view_layers["View Layer"].use_pass_z = True
+        if not scene.view_layers["View Layer"].use_pass_normal:
+            scene.view_layers["View Layer"].use_pass_normal = True
+        if scene.render.engine == 'CYCLES':
+            if not scene.view_layers["View Layer"].use_pass_object_index:
+                scene.view_layers["View Layer"].use_pass_object_index = True
+            if not scene.view_layers["View Layer"].use_pass_vector:
+                scene.view_layers["View Layer"].use_pass_vector = True
 
-    # 2. Set-up nodes
-    tree = scene.node_tree
-    rl = scene.node_tree.nodes["Render Layers"] # I assumed there is always a Render Layers
-    node_norm_and_z = get_or_create_node(tree, "CompositorNodeViewer", "normal_and_zmap")
+        # 2. Set-up nodes
+        tree = scene.node_tree
+        rl = scene.node_tree.nodes["Render Layers"] # I assumed there is always a Render Layers
+        node_norm_and_z = get_or_create_node(tree, "CompositorNodeViewer", "normal_and_zmap")
 
-    VIEWER_FIXED = False # TODO: change code when https://developer.blender.org/T54314 is fixed
-    if scene.render.engine == "CYCLES":
-        if VIEWER_FIXED:
-            node_obj_ind = get_or_create_node(tree, "CompositorNodeViewer", "obj_ind")
-            node_opt_flow = get_or_create_node(tree, "CompositorNodeViewer", "opt_flow")
-        else:
-            ## create two output nodes
-            node_obj_ind = get_or_create_node(tree, "CompositorNodeOutputFile", "obj_ind")
-            node_opt_flow = get_or_create_node(tree, "CompositorNodeOutputFile", "opt_flow")
-            ### set-up their output paths
-            path_render = scene.render.filepath
-            node_obj_ind.base_path = os.path.join(path_render, "obj_ind")
-            node_opt_flow.base_path = os.path.join(path_render, "opt_flow")
+        VIEWER_FIXED = False # TODO: change code when https://developer.blender.org/T54314 is fixed
+        if scene.render.engine == "CYCLES":
+            if VIEWER_FIXED:
+                node_obj_ind = get_or_create_node(tree, "CompositorNodeViewer", "obj_ind")
+                node_opt_flow = get_or_create_node(tree, "CompositorNodeViewer", "opt_flow")
+            else:
+                ## create two output nodes
+                node_obj_ind = get_or_create_node(tree, "CompositorNodeOutputFile", "obj_ind")
+                node_opt_flow = get_or_create_node(tree, "CompositorNodeOutputFile", "opt_flow")
+                ### set-up their output paths
+                path_render = scene.render.filepath
+                node_obj_ind.base_path = os.path.join(path_render, "obj_ind")
+                node_opt_flow.base_path = os.path.join(path_render, "opt_flow")
 
-    # 3. Set-up links between nodes
-    ## create new links if necessary
-    links = tree.links
-    ## Trick: we already have the RGB image so we can connect the Normal to Image
-    ##        and the Z to the Alpha channel
-    if not node_norm_and_z.inputs["Image"].is_linked:
-        links.new(rl.outputs["Normal"], node_norm_and_z.inputs["Image"])
-    if not node_norm_and_z.inputs["Alpha"].is_linked:
-        links.new(rl.outputs["Depth"], node_norm_and_z.inputs["Alpha"])
-    if scene.render.engine == "CYCLES":
-        if VIEWER_FIXED:
-            if not node_obj_ind.inputs["Image"].is_linked:
-                links.new(rl.outputs["IndexOB"], node_obj_ind.inputs["Image"])
-            ## The optical flow needs to be connected to both `Image` and `Alpha`
-            if not node_opt_flow.inputs["Image"].is_linked:
-                links.new(rl.outputs["Vector"], node_opt_flow.inputs["Image"])
-                links.new(rl.outputs["Vector"], node_opt_flow.inputs["Alpha"])
-        else:
-            if not node_obj_ind.inputs["Image"].is_linked:
-                links.new(rl.outputs["IndexOB"], node_obj_ind.inputs["Image"])
-            if not node_opt_flow.inputs["Image"].is_linked:
-                links.new(rl.outputs["Vector"], node_opt_flow.inputs["Image"])
+        # 3. Set-up links between nodes
+        ## create new links if necessary
+        links = tree.links
+        ## Trick: we already have the RGB image so we can connect the Normal to Image
+        ##        and the Z to the Alpha channel
+        if not node_norm_and_z.inputs["Image"].is_linked:
+            links.new(rl.outputs["Normal"], node_norm_and_z.inputs["Image"])
+        if not node_norm_and_z.inputs["Alpha"].is_linked:
+            links.new(rl.outputs["Depth"], node_norm_and_z.inputs["Alpha"])
+        if scene.render.engine == "CYCLES":
+            if VIEWER_FIXED:
+                if not node_obj_ind.inputs["Image"].is_linked:
+                    links.new(rl.outputs["IndexOB"], node_obj_ind.inputs["Image"])
+                ## The optical flow needs to be connected to both `Image` and `Alpha`
+                if not node_opt_flow.inputs["Image"].is_linked:
+                    links.new(rl.outputs["Vector"], node_opt_flow.inputs["Image"])
+                    links.new(rl.outputs["Vector"], node_opt_flow.inputs["Alpha"])
+            else:
+                if not node_obj_ind.inputs["Image"].is_linked:
+                    links.new(rl.outputs["IndexOB"], node_obj_ind.inputs["Image"])
+                if not node_opt_flow.inputs["Image"].is_linked:
+                    links.new(rl.outputs["Vector"], node_opt_flow.inputs["Image"])
 
-    # 4. Save camera_info
-    dict_cam_info = {}
-    render = scene.render
-    cam = scene.camera
-    ## img file format
-    dict_cam_info['img_format'] = render.image_settings.file_format
-    ## camera image resolution
-    res_x, res_y = get_scene_resolution(scene)
-    dict_cam_info['img_res_x'] = res_x
-    dict_cam_info['img_res_y'] = res_y
-    ## camera intrinsic matrix parameters
-    cam_mat_intr = {}
-    f_x, f_y, c_x, c_y = get_camera_parameters_intrinsic(scene)
-    cam_mat_intr['f_x'] = f_x
-    cam_mat_intr['f_y'] = f_y
-    cam_mat_intr['c_x'] = c_x
-    cam_mat_intr['c_y'] = c_y
-    dict_cam_info['cam_mat_intr'] = cam_mat_intr
-    ## is_stereo
-    is_stereo = render.use_multiview
-    dict_cam_info['is_stereo'] = is_stereo
-    if is_stereo:
-        stereo_info = {}
-        ### left camera file suffix
-        stereo_info['stereo_left_suffix'] = render.views["left"].file_suffix
-        ### right camera file suffix
-        stereo_info['stereo_right_suffix'] = render.views["right"].file_suffix
-        ### stereo mode
-        stereo_info['stereo_mode'] = cam.data.stereo.convergence_mode
-        ### stereo interocular distance
-        stereo_info['stereo_interocular_distance'] = cam.data.stereo.interocular_distance
-        ### stereo pivot
-        stereo_info['stereo_pivot'] = cam.data.stereo.pivot
-        dict_cam_info['stereo_info'] = stereo_info
-    ## save data to a json file
-    gt_dir_path = scene.render.filepath
-    out_path = os.path.join(gt_dir_path, 'camera_info.json')
-    with open(out_path, 'w') as tmp_file:
-        json.dump(dict_cam_info, tmp_file)
+        # 4. Save camera_info
+        dict_cam_info = {}
+        render = scene.render
+        cam = scene.camera
+        ## img file format
+        dict_cam_info['img_format'] = render.image_settings.file_format
+        ## camera image resolution
+        res_x, res_y = get_scene_resolution(scene)
+        dict_cam_info['img_res_x'] = res_x
+        dict_cam_info['img_res_y'] = res_y
+        ## camera intrinsic matrix parameters
+        cam_mat_intr = {}
+        f_x, f_y, c_x, c_y = get_camera_parameters_intrinsic(scene)
+        cam_mat_intr['f_x'] = f_x
+        cam_mat_intr['f_y'] = f_y
+        cam_mat_intr['c_x'] = c_x
+        cam_mat_intr['c_y'] = c_y
+        dict_cam_info['cam_mat_intr'] = cam_mat_intr
+        ## is_stereo
+        is_stereo = render.use_multiview
+        dict_cam_info['is_stereo'] = is_stereo
+        if is_stereo:
+            stereo_info = {}
+            ### left camera file suffix
+            stereo_info['stereo_left_suffix'] = render.views["left"].file_suffix
+            ### right camera file suffix
+            stereo_info['stereo_right_suffix'] = render.views["right"].file_suffix
+            ### stereo mode
+            stereo_info['stereo_mode'] = cam.data.stereo.convergence_mode
+            ### stereo interocular distance
+            stereo_info['stereo_interocular_distance'] = cam.data.stereo.interocular_distance
+            ### stereo pivot
+            stereo_info['stereo_pivot'] = cam.data.stereo.pivot
+            dict_cam_info['stereo_info'] = stereo_info
+        ## save data to a json file
+        gt_dir_path = scene.render.filepath
+        out_path = os.path.join(gt_dir_path, 'camera_info.json')
+        with open(out_path, 'w') as tmp_file:
+            json.dump(dict_cam_info, tmp_file)
 
 
 @persistent # TODO: not sure if I should be using @persistent
