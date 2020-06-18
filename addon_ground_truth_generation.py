@@ -1,4 +1,4 @@
-# bl_info
+# bl_info # read more: https://wiki.blender.org/wiki/Process/Addons/Guidelines/metainfo
 bl_info = {
         "name":"Ground Truth Generation",
         "description":"Generate ground truth data (e.g., depth map) for Computer Vision applications.",
@@ -7,8 +7,8 @@ bl_info = {
         "blender":(2, 82, 7),
         "location":"PROPERTIES",
         "warning":"", # used for warning icon and text in addons panel
-        "wiki_url":"",
-        "support":"TESTING",
+        "wiki_url":"https://github.com/Cartucho/vision_blender",
+        "support":"COMMUNITY",
         "category":"Render"
     }
 
