@@ -205,13 +205,23 @@ class RENDER_PT_gt_generator(GroundTruthGeneratorPanel):
         layout.use_property_split = False
         layout.use_property_decorate = False  # No animation.
 
+        # boolean flags to control what is being saved
+        #  reference: https://github.com/sobotka/blender/blob/662d94e020f36e75b9c6b4a258f31c1625573ee8/release/scripts/startup/bl_ui/properties_output.py
+        flow = layout.grid_flow(row_major=True, columns=0, even_columns=True, even_rows=False, align=False)
+        col = flow.column()
+        col.prop(my_addon, "bool_save_depth", text="Depth")
+        col = flow.column()
+        col.prop(my_addon, "bool_save_normals", text="Normals")
+        col = flow.column()
+        col.prop(my_addon, "bool_save_extr", text="Extrinsic")
+        col = flow.column()
+        col.prop(my_addon, "bool_save_opt_flow", text="Optical Flow")
+        col = flow.column()
+        col.prop(my_addon, "bool_save_obj_ind", text="Segmentation")
+        col = flow.column()
+        col.prop(my_addon, "bool_save_obj_poses", text="Pose Tracking")
+
         """ testing a bool """
-        layout.prop(my_addon, "bool_save_depth", text="Depth")
-        layout.prop(my_addon, "bool_save_normals", text="Normals")
-        layout.prop(my_addon, "bool_save_extr", text="Extrinsic")
-        layout.prop(my_addon, "bool_save_opt_flow", text="Optical Flow")
-        layout.prop(my_addon, "bool_save_obj_ind", text="Semantic Segmentation")
-        layout.prop(my_addon, "bool_save_obj_poses", text="Pose Tracking")
         # check if bool property is enabled
         if (my_addon.bool_save_depth == True):
             print ("Save depth Enabled")
@@ -434,9 +444,9 @@ def load_handler_after_rend_frame(scene): # TODO: not sure if this is the best p
         out_path = os.path.join(gt_dir_path, '{:04d}.npz'.format(scene.frame_current))
         #print(out_path)
         np.savez_compressed(out_path,
-                            extr=extrinsic_mat,
+                            extrinsic_mat=extrinsic_mat,
                             normal_map=normal,
-                            z_map=z
+                            depth_map=z
                            )
         # ref: https://stackoverflow.com/questions/35133317/numpy-save-some-arrays-at-once
 
@@ -467,5 +477,3 @@ def unregister():
 
 if __name__ == "__main__":
     register()
-
-# reference: https://github.com/sobotka/blender/blob/662d94e020f36e75b9c6b4a258f31c1625573ee8/release/scripts/startup/bl_ui/properties_output.py
