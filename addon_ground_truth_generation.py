@@ -1,6 +1,6 @@
 # bl_info # read more: https://wiki.blender.org/wiki/Process/Addons/Guidelines/metainfo
 bl_info = {
-        "name":"Ground Truth Generation",
+        "name":"VisionBlender - Computer Vision Ground Truth Generation",
         "description":"Generate ground truth data (e.g., depth map) for Computer Vision applications.",
         "author":"Joao Cartucho",
         "version":(1, 0),
@@ -145,7 +145,32 @@ class MyAddonProperties(PropertyGroup):
         )
     bool_save_depth : BoolProperty(
         name="Depth",
-        description="Save depth data",
+        description="Save depth maps",
+        default = False
+        )
+    bool_save_normals : BoolProperty(
+        name="Normals",
+        description="Save surface normals",
+        default = False
+        )
+    bool_save_extr : BoolProperty(
+        name="Extrinsic",
+        description="Save extrinsic camera matrix",
+        default = False
+        )
+    bool_save_opt_flow : BoolProperty(
+        name="Optical Flow",
+        description="Save optical flow",
+        default = False
+        )
+    bool_save_obj_ind : BoolProperty(
+        name="Semantic",
+        description="Save semantic segmentation",
+        default = False
+        )
+    bool_save_obj_poses : BoolProperty(
+        name="Poses",
+        description="Save object poses",
         default = False
         )
 
@@ -160,7 +185,7 @@ class GroundTruthGeneratorPanel(Panel):
 class RENDER_PT_gt_generator(GroundTruthGeneratorPanel):
     """Parent panel"""
     global intrinsic_mat
-    bl_label = "Ground Truth Generator"
+    bl_label = "VisionBlender - Ground Truth Generator"
     bl_idname = "RENDER_PT_gt_generator"
     COMPAT_ENGINES = {'BLENDER_EEVEE', 'BLENDER_CYCLES'}#, 'BLENDER_WORKBENCH' # TODO: see what happens when using the WORKBENCH render
     bl_options = {'DEFAULT_CLOSED'}
@@ -181,7 +206,12 @@ class RENDER_PT_gt_generator(GroundTruthGeneratorPanel):
         layout.use_property_decorate = False  # No animation.
 
         """ testing a bool """
-        layout.prop(my_addon, "bool_save_depth", text="Bool Property")
+        layout.prop(my_addon, "bool_save_depth", text="Depth")
+        layout.prop(my_addon, "bool_save_normals", text="Normals")
+        layout.prop(my_addon, "bool_save_extr", text="Extrinsic")
+        layout.prop(my_addon, "bool_save_opt_flow", text="Optical Flow")
+        layout.prop(my_addon, "bool_save_obj_ind", text="Semantic Segmentation")
+        layout.prop(my_addon, "bool_save_obj_poses", text="Pose Tracking")
         # check if bool property is enabled
         if (my_addon.bool_save_depth == True):
             print ("Save depth Enabled")
