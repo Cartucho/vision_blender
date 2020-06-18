@@ -137,12 +137,12 @@ def correct_cycles_depth(z_map, res_x, res_y, f_x, f_y, c_x, c_y, INVALID_POINT)
 
 # classes
 class MyAddonProperties(PropertyGroup):
-    # boolean to choose between saving ground truth data or not
-    save_gt_data : BoolProperty(
+    # booleans
+    bool_save_gt_data : BoolProperty(
         name = "Ground truth",
-        default = True,
         description = "Save ground truth data",
-    )
+        default = True,
+        )
 
 
 #class RENDER_OT_save_gt_data(bpy.types.Operator):
@@ -168,13 +168,13 @@ class RENDER_PT_gt_generator(GroundTruthGeneratorPanel):
 
     def draw_header(self, context):
         rd = context.scene.render
-        self.layout.prop(context.scene.my_addon, "save_gt_data", text="")
+        self.layout.prop(context.scene.my_addon, "bool_save_gt_data", text="")
 
 
     def draw(self, context):
         scene = context.scene
         layout = self.layout
-        layout.active = context.scene.my_addon.save_gt_data
+        layout.active = context.scene.my_addon.bool_save_gt_data
 
         layout.use_property_split = False
         layout.use_property_decorate = False  # No animation.
@@ -349,7 +349,7 @@ def load_handler_after_rend_frame(scene): # TODO: not sure if this is the best p
     """ This script runs after rendering each frame """
     # ref: https://blenderartists.org/t/how-to-run-script-on-every-frame-in-blender-render/699404/2
     # check if user wants to generate the ground truth data
-    if scene.my_addon.save_gt_data:
+    if scene.my_addon.bool_save_gt_data:
         gt_dir_path = scene.render.filepath
         #print(gt_dir_path)
         # save ground truth data
