@@ -128,9 +128,10 @@ def correct_cycles_depth(z_map, res_x, res_y, f_x, f_y, c_x, c_y):
     for y in range(res_y):
         b = ((c_y - y) / f_y)
         for x in range(res_x):
-            a = ((c_x - x) / f_x)
-            new_value = z_map[y][x] / np.linalg.norm([1, a, b])
-            z_map[y][x] = new_value
+            val = z_map[y][x]
+            if val != -1.0:
+                a = ((c_x - x) / f_x)
+                z_map[y][x] = val / np.linalg.norm([1, a, b])
     return z_map
 
 
@@ -234,7 +235,7 @@ classes = (
 )
 
 
-def get_node(tree, node_type, node_name):
+def get_or_create_node(tree, node_type, node_name):
     node_ind = tree.nodes.find(node_name)
     if node_ind == -1:
         v = tree.nodes.new(node_type)
@@ -254,7 +255,6 @@ def load_handler_render_init(scene):
         scene.view_layers["View Layer"].use_pass_z = True
     if not scene.view_layers["View Layer"].use_pass_normal:
         scene.view_layers["View Layer"].use_pass_normal = True
-
     if scene.render.engine == 'CYCLES':
         if not scene.view_layers["View Layer"].use_pass_object_index:
             scene.view_layers["View Layer"].use_pass_object_index = True
@@ -263,16 +263,22 @@ def load_handler_render_init(scene):
 
     # 2. Set-up nodes
     tree = scene.node_tree
-    rl = scene.node_tree.nodes["Render Layers"]
-    node_norm_and_z = get_node(tree, "CompositorNodeViewer", "normal_and_zmap")
+    rl = scene.node_tree.nodes["Render Layers"] # I assumed there is always a Render Layers
+    node_norm_and_z = get_or_create_node(tree, "CompositorNodeViewer", "normal_and_zmap")
 
+    VIEWER_FIXED = False # TODO: change code when https://developer.blender.org/T54314 is fixed
     if scene.render.engine == "CYCLES":
-        node_obj_ind = get_node(tree, "CompositorNodeOutputFile", "obj_ind")
-        node_opt_flow = get_node(tree, "CompositorNodeOutputFile", "opt_flow")
-        path_render = scene.render.filepath
-        node_obj_ind.base_path = os.path.join(path_render, "obj_ind_mask/")
-        print(node_obj_ind.base_path)
-        node_opt_flow.base_path = os.path.join(path_render, "vector/")
+        if VIEWER_FIXED:
+            node_obj_ind = get_or_create_node(tree, "CompositorNodeViewer", "obj_ind")
+            node_opt_flow = get_or_create_node(tree, "CompositorNodeViewer", "opt_flow")
+        else:
+            ## create two output nodes
+            node_obj_ind = get_or_create_node(tree, "CompositorNodeOutputFile", "obj_ind")
+            node_opt_flow = get_or_create_node(tree, "CompositorNodeOutputFile", "opt_flow")
+            ### set-up their output paths
+            path_render = scene.render.filepath
+            node_obj_ind.base_path = os.path.join(path_render, "obj_ind")
+            node_opt_flow.base_path = os.path.join(path_render, "opt_flow")
 
     # 3. Set-up links between nodes
     ## create new links if necessary
@@ -283,13 +289,19 @@ def load_handler_render_init(scene):
         links.new(rl.outputs["Normal"], node_norm_and_z.inputs["Image"])
     if not node_norm_and_z.inputs["Alpha"].is_linked:
         links.new(rl.outputs["Depth"], node_norm_and_z.inputs["Alpha"])
-
     if scene.render.engine == "CYCLES":
-        if not node_obj_ind.inputs["Image"].is_linked:
-            links.new(rl.outputs["IndexOB"], node_obj_ind.inputs["Image"])
-        ## The optical flow needs to be connected to both `Image` and `Alpha`
-        if not node_opt_flow.inputs["Image"].is_linked:
-            links.new(rl.outputs["Vector"], node_opt_flow.inputs["Image"])
+        if VIEWER_FIXED:
+            if not node_obj_ind.inputs["Image"].is_linked:
+                links.new(rl.outputs["IndexOB"], node_obj_ind.inputs["Image"])
+            ## The optical flow needs to be connected to both `Image` and `Alpha`
+            if not node_opt_flow.inputs["Image"].is_linked:
+                links.new(rl.outputs["Vector"], node_opt_flow.inputs["Image"])
+                links.new(rl.outputs["Vector"], node_opt_flow.inputs["Alpha"])
+        else:
+            if not node_obj_ind.inputs["Image"].is_linked:
+                links.new(rl.outputs["IndexOB"], node_obj_ind.inputs["Image"])
+            if not node_opt_flow.inputs["Image"].is_linked:
+                links.new(rl.outputs["Vector"], node_opt_flow.inputs["Image"])
 
     # 4. Save camera_info
     dict_cam_info = {}
@@ -362,11 +374,22 @@ def load_handler_after_rend_frame(scene): # TODO: not sure if this is the best p
         #    x
         pixels_numpy.resize((res_y, res_x, 4)) # Numpy works with (y, x, channels)
         normal = pixels_numpy[:, :, 0:3]
-        print("Normal:")
-        print(normal[567, 1020])
         z = pixels_numpy[:, :, 3]
+        # points at infinity get a -1 value
+        max_dist = scene.camera.data.clip_end
+        normal[z > max_dist] = -1.0
+        z[z > max_dist] = -1.0
         if scene.render.engine == "CYCLES":
             z = correct_cycles_depth(z, res_x, res_y, f_x, f_y, c_x, c_y)
+        """ Obj Index + Opt flow"""
+        VIEWER_FIXED = False # TODO: change code when https://developer.blender.org/T54314 is fixed
+        if VIEWER_FIXED:
+            # TODO: make each Image Viewer active one-by-one and copy values
+            pass
+        else:
+            # TODO
+            #obj_ind_file_path = os.path.join(gt_dir_path, "obj_ind", "Image{}.png".format(5))
+            pass
         """ Save data """
         # Blender by default assumes a padding of 4 digits
         out_path = os.path.join(gt_dir_path, '{:04d}.npz'.format(scene.frame_current))
