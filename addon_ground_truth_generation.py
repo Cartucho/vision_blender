@@ -124,12 +124,12 @@ def get_camera_parameters_extrinsic(scene):
     return extr
 
 
-def correct_cycles_depth(z_map, res_x, res_y, f_x, f_y, c_x, c_y):
+def correct_cycles_depth(z_map, res_x, res_y, f_x, f_y, c_x, c_y, INVALID_POINT):
     for y in range(res_y):
         b = ((c_y - y) / f_y)
         for x in range(res_x):
             val = z_map[y][x]
-            if val != -1.0:
+            if val != INVALID_POINT:
                 a = ((c_x - x) / f_x)
                 z_map[y][x] = val / np.linalg.norm([1, a, b])
     return z_map
@@ -377,10 +377,11 @@ def load_handler_after_rend_frame(scene): # TODO: not sure if this is the best p
         z = pixels_numpy[:, :, 3]
         # points at infinity get a -1 value
         max_dist = scene.camera.data.clip_end
-        normal[z > max_dist] = -1.0
-        z[z > max_dist] = -1.0
+        INVALID_POINT = -1.0
+        normal[z > max_dist] = INVALID_POINT
+        z[z > max_dist] = INVALID_POINT
         if scene.render.engine == "CYCLES":
-            z = correct_cycles_depth(z, res_x, res_y, f_x, f_y, c_x, c_y)
+            z = correct_cycles_depth(z, res_x, res_y, f_x, f_y, c_x, c_y, INVALID_POINT)
         """ Obj Index + Opt flow"""
         VIEWER_FIXED = False # TODO: change code when https://developer.blender.org/T54314 is fixed
         if VIEWER_FIXED:
