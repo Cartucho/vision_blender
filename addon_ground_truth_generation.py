@@ -185,7 +185,7 @@ class GroundTruthGeneratorPanel(Panel):
 class RENDER_PT_gt_generator(GroundTruthGeneratorPanel):
     """Parent panel"""
     global intrinsic_mat
-    bl_label = "VisionBlender - Ground Truth Generator"
+    bl_label = "VisionBlender UI"
     bl_idname = "RENDER_PT_gt_generator"
     COMPAT_ENGINES = {'BLENDER_EEVEE', 'BLENDER_CYCLES'}#, 'BLENDER_WORKBENCH' # TODO: see what happens when using the WORKBENCH render
     bl_options = {'DEFAULT_CLOSED'}
@@ -209,17 +209,17 @@ class RENDER_PT_gt_generator(GroundTruthGeneratorPanel):
         #  reference: https://github.com/sobotka/blender/blob/662d94e020f36e75b9c6b4a258f31c1625573ee8/release/scripts/startup/bl_ui/properties_output.py
         flow = layout.grid_flow(row_major=True, columns=0, even_columns=True, even_rows=False, align=False)
         col = flow.column()
-        col.prop(my_addon, "bool_save_depth", text="Depth")
+        col.prop(my_addon, "bool_save_depth", text="Depth / Disparity")
+        col = flow.column()
+        col.prop(my_addon, "bool_save_obj_ind", text="Segmentation masks")
         col = flow.column()
         col.prop(my_addon, "bool_save_normals", text="Normals")
         col = flow.column()
-        col.prop(my_addon, "bool_save_extr", text="Extrinsic")
-        col = flow.column()
         col.prop(my_addon, "bool_save_opt_flow", text="Optical Flow")
         col = flow.column()
-        col.prop(my_addon, "bool_save_obj_ind", text="Segmentation")
+        col.prop(my_addon, "bool_save_obj_poses", text="Objects' Pose")
         col = flow.column()
-        col.prop(my_addon, "bool_save_obj_poses", text="Pose Tracking")
+        col.prop(my_addon, "bool_save_extr", text="Camara Parameters")
 
         """ testing a bool """
         # check if bool property is enabled
@@ -298,11 +298,13 @@ def load_handler_render_init(scene):
     # check if user wants to generate the ground truth data
     if scene.my_addon.bool_save_gt_data:
         #print("Initializing a render job...")
+        my_addon = scene.my_addon
         # 1. Set-up Passes
         if not scene.use_nodes:
             scene.use_nodes = True
-        if not scene.view_layers["View Layer"].use_pass_z:
-            scene.view_layers["View Layer"].use_pass_z = True
+        if my_addon.bool_save_depth:
+            if not scene.view_layers["View Layer"].use_pass_z:
+                scene.view_layers["View Layer"].use_pass_z = True
         if not scene.view_layers["View Layer"].use_pass_normal:
             scene.view_layers["View Layer"].use_pass_normal = True
         if scene.render.engine == 'CYCLES':
@@ -337,8 +339,9 @@ def load_handler_render_init(scene):
         ##        and the Z to the Alpha channel
         if not node_norm_and_z.inputs["Image"].is_linked:
             links.new(rl.outputs["Normal"], node_norm_and_z.inputs["Image"])
-        if not node_norm_and_z.inputs["Alpha"].is_linked:
-            links.new(rl.outputs["Depth"], node_norm_and_z.inputs["Alpha"])
+        if my_addon.bool_save_depth:
+            if not node_norm_and_z.inputs["Alpha"].is_linked:
+                links.new(rl.outputs["Depth"], node_norm_and_z.inputs["Alpha"])
         if scene.render.engine == "CYCLES":
             if VIEWER_FIXED:
                 if not node_obj_ind.inputs["Image"].is_linked:
@@ -400,6 +403,7 @@ def load_handler_after_rend_frame(scene): # TODO: not sure if this is the best p
     # ref: https://blenderartists.org/t/how-to-run-script-on-every-frame-in-blender-render/699404/2
     # check if user wants to generate the ground truth data
     if scene.my_addon.bool_save_gt_data:
+        my_addon = scene.my_addon
         gt_dir_path = scene.render.filepath
         #print(gt_dir_path)
         # save ground truth data
@@ -415,6 +419,7 @@ def load_handler_after_rend_frame(scene): # TODO: not sure if this is the best p
         ## get data
         pixels = bpy.data.images['Viewer Node'].pixels
         #print(len(pixels)) # size = width * height * 4 (rgba)
+        print(len(pixels))
         pixels_numpy = np.array(pixels[:])
         res_x, res_y = get_scene_resolution(scene)
         #   .---> y
@@ -424,14 +429,16 @@ def load_handler_after_rend_frame(scene): # TODO: not sure if this is the best p
         #    x
         pixels_numpy.resize((res_y, res_x, 4)) # Numpy works with (y, x, channels)
         normal = pixels_numpy[:, :, 0:3]
-        z = pixels_numpy[:, :, 3]
-        # points at infinity get a -1 value
-        max_dist = scene.camera.data.clip_end
-        INVALID_POINT = -1.0
-        normal[z > max_dist] = INVALID_POINT
-        z[z > max_dist] = INVALID_POINT
-        if scene.render.engine == "CYCLES":
-            z = correct_cycles_depth(z, res_x, res_y, f_x, f_y, c_x, c_y, INVALID_POINT)
+        z = None
+        if my_addon.bool_save_depth:
+            z = pixels_numpy[:, :, 3]
+            # points at infinity get a -1 value
+            max_dist = scene.camera.data.clip_end
+            INVALID_POINT = -1.0
+            normal[z > max_dist] = INVALID_POINT
+            z[z > max_dist] = INVALID_POINT
+            if scene.render.engine == "CYCLES":
+                z = correct_cycles_depth(z, res_x, res_y, f_x, f_y, c_x, c_y, INVALID_POINT)
         """ Obj Index + Opt flow"""
         VIEWER_FIXED = False # TODO: change code when https://developer.blender.org/T54314 is fixed
         if VIEWER_FIXED:
