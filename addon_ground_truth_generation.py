@@ -432,6 +432,7 @@ def load_handler_after_rend_frame(scene): # TODO: not sure if this is the best p
         z = None
         if my_addon.bool_save_depth:
             z = pixels_numpy[:, :, 3]
+            z = np.flip(z, 0) # flip vertically (in Blender y in the image points up instead of down)
             # points at infinity get a -1 value
             max_dist = scene.camera.data.clip_end
             INVALID_POINT = -1.0
