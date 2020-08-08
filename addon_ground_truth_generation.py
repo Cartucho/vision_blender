@@ -146,32 +146,32 @@ class MyAddonProperties(PropertyGroup):
     bool_save_depth : BoolProperty(
         name="Depth",
         description="Save depth maps",
-        default = False
+        default = True
         )
     bool_save_normals : BoolProperty(
         name="Normals",
         description="Save surface normals",
         default = False
         )
-    bool_save_extr : BoolProperty(
-        name="Extrinsic",
-        description="Save extrinsic camera matrix",
-        default = False
+    bool_save_cam_param : BoolProperty(
+        name="Camera parameters",
+        description="Save camera parameters",
+        default = True
         )
     bool_save_opt_flow : BoolProperty(
         name="Optical Flow",
         description="Save optical flow",
-        default = False
+        default = True
         )
     bool_save_obj_ind : BoolProperty(
         name="Semantic",
         description="Save semantic segmentation",
-        default = False
+        default = True
         )
     bool_save_obj_poses : BoolProperty(
-        name="Poses",
-        description="Save object poses",
-        default = False
+        name="Objects Pose",
+        description="Save object pose",
+        default = True
         )
 
 
@@ -219,7 +219,7 @@ class RENDER_PT_gt_generator(GroundTruthGeneratorPanel):
         col = flow.column()
         col.prop(my_addon, "bool_save_obj_poses", text="Objects' Pose")
         col = flow.column()
-        col.prop(my_addon, "bool_save_extr", text="Camara Parameters")
+        col.prop(my_addon, "bool_save_cam_param", text="Camara Parameters")
 
         """ testing a bool """
         # check if bool property is enabled
