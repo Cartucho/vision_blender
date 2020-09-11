@@ -1,4 +1,7 @@
+THIS CODE IS UNDER CONSTRUCTION, THE FIRST VERSION WILL BE RELEASED ASAP.
+
 # vision_blender
+
 A Blender addon to generate synthetic ground truth data (benchmarks) for Computer Vision applications.
 
 
