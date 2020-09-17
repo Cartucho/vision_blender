@@ -148,13 +148,13 @@ def get_or_create_node(tree, node_type, node_name):
 @persistent # TODO: not sure if I should be using @persistent
 def load_handler_render_init(scene):
     # check if user wants to generate the ground truth data
-    if scene.my_addon.bool_save_gt_data:
+    if scene.vision_blender.bool_save_gt_data:
         #print("Initializing a render job...")
-        my_addon = scene.my_addon
+        vision_blender = scene.vision_blender
         # 1. Set-up Passes
         if not scene.use_nodes:
             scene.use_nodes = True
-        if my_addon.bool_save_depth:
+        if vision_blender.bool_save_depth:
             if not scene.view_layers["View Layer"].use_pass_z:
                 scene.view_layers["View Layer"].use_pass_z = True
         if not scene.view_layers["View Layer"].use_pass_normal:
@@ -191,7 +191,7 @@ def load_handler_render_init(scene):
         ##        and the Z to the Alpha channel
         if not node_norm_and_z.inputs["Image"].is_linked:
             links.new(rl.outputs["Normal"], node_norm_and_z.inputs["Image"])
-        if my_addon.bool_save_depth:
+        if vision_blender.bool_save_depth:
             if not node_norm_and_z.inputs["Alpha"].is_linked:
                 links.new(rl.outputs["Depth"], node_norm_and_z.inputs["Alpha"])
         if scene.render.engine == "CYCLES":
@@ -254,8 +254,8 @@ def load_handler_after_rend_frame(scene): # TODO: not sure if this is the best p
     """ This script runs after rendering each frame """
     # ref: https://blenderartists.org/t/how-to-run-script-on-every-frame-in-blender-render/699404/2
     # check if user wants to generate the ground truth data
-    if scene.my_addon.bool_save_gt_data:
-        my_addon = scene.my_addon
+    if scene.vision_blender.bool_save_gt_data:
+        vision_blender = scene.vision_blender
         gt_dir_path = scene.render.filepath
         #print(gt_dir_path)
         # save ground truth data
@@ -282,7 +282,7 @@ def load_handler_after_rend_frame(scene): # TODO: not sure if this is the best p
         pixels_numpy.resize((res_y, res_x, 4)) # Numpy works with (y, x, channels)
         normal = pixels_numpy[:, :, 0:3]
         z = None
-        if my_addon.bool_save_depth:
+        if vision_blender.bool_save_depth:
             z = pixels_numpy[:, :, 3]
             z = np.flip(z, 0) # flip vertically (in Blender y in the image points up instead of down)
             # points at infinity get a -1 value
@@ -372,15 +372,15 @@ class RENDER_PT_gt_generator(GroundTruthGeneratorPanel):
         return (context.engine in cls.COMPAT_ENGINES)
 
     def draw_header(self, context):
-        self.layout.prop(context.scene.my_addon, "bool_save_gt_data", text="")
+        self.layout.prop(context.scene.vision_blender, "bool_save_gt_data", text="")
 
     def draw(self, context):
         scene = context.scene
         rd = scene.render
         layout = self.layout
 
-        my_addon = scene.my_addon
-        layout.active = my_addon.bool_save_gt_data
+        vision_blender = scene.vision_blender
+        layout.active = vision_blender.bool_save_gt_data
 
         layout.use_property_split = False
         layout.use_property_decorate = False  # No animation.
@@ -389,23 +389,23 @@ class RENDER_PT_gt_generator(GroundTruthGeneratorPanel):
         #  reference: https://github.com/sobotka/blender/blob/662d94e020f36e75b9c6b4a258f31c1625573ee8/release/scripts/startup/bl_ui/properties_output.py
         flow = layout.grid_flow(row_major=True, columns=0, even_columns=True, even_rows=False, align=False)
         col = flow.column()
-        col.prop(my_addon, "bool_save_depth", text="Depth / Disparity")
+        col.prop(vision_blender, "bool_save_depth", text="Depth / Disparity")
         col = flow.column()
         col.enabled = context.engine == 'CYCLES' # ref: https://blenderartists.org/t/how-to-disable-a-checkbox-when-a-dropdown-option-is-picked/612801/2
-        col.prop(my_addon, "bool_save_segmentation_masks", text="Segmentation masks")
+        col.prop(vision_blender, "bool_save_segmentation_masks", text="Segmentation masks")
         col = flow.column()
-        col.prop(my_addon, "bool_save_normals", text="Normals")
+        col.prop(vision_blender, "bool_save_normals", text="Normals")
         col = flow.column()
         col.enabled = context.engine == 'CYCLES'
-        col.prop(my_addon, "bool_save_opt_flow", text="Optical Flow")
+        col.prop(vision_blender, "bool_save_opt_flow", text="Optical Flow")
         col = flow.column()
-        col.prop(my_addon, "bool_save_obj_poses", text="Objects' Pose")
+        col.prop(vision_blender, "bool_save_obj_poses", text="Objects' Pose")
         col = flow.column()
-        col.prop(my_addon, "bool_save_cam_param", text="Camara Parameters")
+        col.prop(vision_blender, "bool_save_cam_param", text="Camara Parameters")
 
         """ testing a bool """
         # check if bool property is enabled
-        if (my_addon.bool_save_depth == True):
+        if (vision_blender.bool_save_depth == True):
             print ("Save depth Enabled")
         else:
             print ("Save depth Disabled")
@@ -469,7 +469,7 @@ def unregister(): # TODO: I do not know what this is useful for
     for cls in classes:
         bpy.utils.unregister_class(cls)
     # unregister the properties
-    del bpy.types.Scene.my_addon
+    del bpy.types.Scene.vision_blender
     # unregister the function being called when rendering each frame
     bpy.app.handlers.render_init.remove(load_handler_render_init)
     # unregister the function being called when rendering each frame
@@ -480,7 +480,7 @@ if __name__ == "__main__": # only for live edit.
     for cls in classes:
         register_class(cls)
     # register the properties
-    bpy.types.Scene.my_addon = PointerProperty(type=MyAddonProperties)
+    bpy.types.Scene.vision_blender = PointerProperty(type=MyAddonProperties)
     # register the function being called when rendering starts
     bpy.app.handlers.render_init.append(load_handler_render_init)
     # register the function being called after rendering each frame
