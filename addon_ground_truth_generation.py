@@ -4,7 +4,7 @@ bl_info = {
         "description":"Generate ground truth data (e.g., depth map) for Computer Vision applications.",
         "author":"Joao Cartucho",
         "version":(1, 0),
-        "blender":(2, 82, 7),
+        "blender":(2, 83, 4),
         "location":"PROPERTIES",
         "warning":"", # used for warning icon and text in addons panel
         "wiki_url":"https://github.com/Cartucho/vision_blender",
@@ -133,154 +133,6 @@ def correct_cycles_depth(z_map, res_x, res_y, f_x, f_y, c_x, c_y, INVALID_POINT)
                 a = ((c_x - x) / f_x)
                 z_map[y][x] = val / np.linalg.norm([1, a, b])
     return z_map
-
-
-# classes
-class MyAddonProperties(PropertyGroup):
-    # booleans
-    bool_save_gt_data : BoolProperty(
-        name = "Ground truth",
-        description = "Save ground truth data",
-        default = True,
-        )
-    bool_save_depth : BoolProperty(
-        name="Depth",
-        description="Save depth maps",
-        default = True
-        )
-    bool_save_normals : BoolProperty(
-        name="Normals",
-        description="Save surface normals",
-        default = False
-        )
-    bool_save_cam_param : BoolProperty(
-        name="Camera parameters",
-        description="Save camera parameters",
-        default = True
-        )
-    bool_save_opt_flow : BoolProperty(
-        name="Optical Flow",
-        description="Save optical flow",
-        default = True
-        )
-    bool_save_obj_ind : BoolProperty(
-        name="Semantic",
-        description="Save semantic segmentation",
-        default = True
-        )
-    bool_save_obj_poses : BoolProperty(
-        name="Objects Pose",
-        description="Save object pose",
-        default = True
-        )
-
-
-class GroundTruthGeneratorPanel(Panel):
-    """Creates a Panel in the Output properties window for exporting ground truth data"""
-    bl_space_type = 'PROPERTIES'
-    bl_region_type = 'WINDOW'
-    bl_context = "output"
-
-
-class RENDER_PT_gt_generator(GroundTruthGeneratorPanel):
-    """Parent panel"""
-    global intrinsic_mat
-    bl_label = "VisionBlender UI"
-    bl_idname = "RENDER_PT_gt_generator"
-    COMPAT_ENGINES = {'BLENDER_EEVEE', 'BLENDER_CYCLES'}#, 'BLENDER_WORKBENCH' # TODO: see what happens when using the WORKBENCH render
-    bl_options = {'DEFAULT_CLOSED'}
-
-
-    def draw_header(self, context):
-        rd = context.scene.render
-        self.layout.prop(context.scene.my_addon, "bool_save_gt_data", text="")
-
-
-    def draw(self, context):
-        scene = context.scene
-        my_addon = scene.my_addon
-        layout = self.layout
-        layout.active = my_addon.bool_save_gt_data
-
-        layout.use_property_split = False
-        layout.use_property_decorate = False  # No animation.
-
-        # boolean flags to control what is being saved
-        #  reference: https://github.com/sobotka/blender/blob/662d94e020f36e75b9c6b4a258f31c1625573ee8/release/scripts/startup/bl_ui/properties_output.py
-        flow = layout.grid_flow(row_major=True, columns=0, even_columns=True, even_rows=False, align=False)
-        col = flow.column()
-        col.prop(my_addon, "bool_save_depth", text="Depth / Disparity")
-        col = flow.column()
-        col.prop(my_addon, "bool_save_obj_ind", text="Segmentation masks")
-        col = flow.column()
-        col.prop(my_addon, "bool_save_normals", text="Normals")
-        col = flow.column()
-        col.prop(my_addon, "bool_save_opt_flow", text="Optical Flow")
-        col = flow.column()
-        col.prop(my_addon, "bool_save_obj_poses", text="Objects' Pose")
-        col = flow.column()
-        col.prop(my_addon, "bool_save_cam_param", text="Camara Parameters")
-
-        """ testing a bool """
-        # check if bool property is enabled
-        if (my_addon.bool_save_depth == True):
-            print ("Save depth Enabled")
-        else:
-            print ("Save depth Disabled")
-
-        # Get camera parameters
-        """ show intrinsic parameters """
-        layout.label(text="Intrinsic parameters [pixels]:")
-        f_x, f_y, c_x, c_y = get_camera_parameters_intrinsic(scene)
-
-        box_intr = self.layout.box()
-        col_intr = box_intr.column()
-
-        row_intr_0 = col_intr.split()
-        row_intr_0.label(text=str(f_x))# "{}".format(round(f_x, 3))
-        row_intr_0.label(text='0')
-        row_intr_0.label(text=str(c_x))
-
-        row_intr_1 = col_intr.split()
-        row_intr_1.label(text='0')
-        row_intr_1.label(text=str(f_y))
-        row_intr_1.label(text=str(c_y))
-
-        row_intr_2 = col_intr.split()
-        row_intr_2.label(text='0')
-        row_intr_2.label(text='0')
-        row_intr_2.label(text='1')
-
-        """ show extrinsic parameters """
-        layout.label(text="Extrinsic parameters [pixels]:")
-
-        extr = get_camera_parameters_extrinsic(scene)
-
-        box_ext = self.layout.box()
-        col_ext = box_ext.column()
-
-        row_ext_0 = col_ext.split()
-        row_ext_0.label(text=str(extr[0, 0]))
-        row_ext_0.label(text=str(extr[0, 1]))
-        row_ext_0.label(text=str(extr[0, 2]))
-        row_ext_0.label(text=str(extr[0, 3]))
-
-        row_ext_1 = col_ext.split()
-        row_ext_1.label(text=str(extr[1, 0]))
-        row_ext_1.label(text=str(extr[1, 1]))
-        row_ext_1.label(text=str(extr[1, 2]))
-        row_ext_1.label(text=str(extr[1, 3]))
-
-        row_ext_2 = col_ext.split()
-        row_ext_2.label(text=str(extr[2, 0]))
-        row_ext_2.label(text=str(extr[2, 1]))
-        row_ext_2.label(text=str(extr[2, 2]))
-        row_ext_2.label(text=str(extr[2, 3]))
-
-classes = (
-    RENDER_PT_gt_generator,
-    MyAddonProperties,
-)
 
 
 def get_or_create_node(tree, node_type, node_name):
@@ -460,21 +312,159 @@ def load_handler_after_rend_frame(scene): # TODO: not sure if this is the best p
                            )
         # ref: https://stackoverflow.com/questions/35133317/numpy-save-some-arrays-at-once
 
+# classes
+class MyAddonProperties(PropertyGroup):
+    # booleans
+    bool_save_gt_data : BoolProperty(
+        name = "Ground truth",
+        description = "Save ground truth data",
+        default = True,
+        )
+    bool_save_depth : BoolProperty(
+        name = "Depth",
+        description = "Save depth maps",
+        default = True
+        )
+    bool_save_normals : BoolProperty(
+        name = "Normals",
+        description = "Save surface normals",
+        default = True
+        )
+    bool_save_cam_param : BoolProperty(
+        name = "Camera parameters",
+        description = "Save camera parameters",
+        default = True
+        )
+    bool_save_opt_flow : BoolProperty(
+        name = "Optical Flow",
+        description = "Save optical flow",
+        default = True
+        )
+    bool_save_obj_ind : BoolProperty(
+        name = "Semantic",
+        description = "Save semantic segmentation",
+        default = True
+        )
+    bool_save_obj_poses : BoolProperty(
+        name = "Objects Pose",
+        description = "Save object pose",
+        default = True
+        )
 
-# registration
-def register():
-    # register the classes
-    for cls in classes:
-        bpy.utils.register_class(cls)
-    # register the properties
-    bpy.types.Scene.my_addon = PointerProperty(type=MyAddonProperties)
-    # register the function being called when rendering starts
-    bpy.app.handlers.render_init.append(load_handler_render_init)
-    # register the function being called after rendering each frame
-    bpy.app.handlers.render_post.append(load_handler_after_rend_frame)
+
+class GroundTruthGeneratorPanel(Panel):
+    """Creates a Panel in the Output properties window for exporting ground truth data"""
+    bl_space_type = 'PROPERTIES'
+    bl_region_type = 'WINDOW'
+    bl_context = "output"
 
 
-def unregister():
+class RENDER_PT_gt_generator(GroundTruthGeneratorPanel):
+    """Parent panel"""
+    global intrinsic_mat
+    bl_label = "VisionBlender UI"
+    bl_idname = "RENDER_PT_gt_generator"
+    COMPAT_ENGINES = {'BLENDER_EEVEE', 'CYCLES'}
+    bl_options = {'DEFAULT_CLOSED'}
+
+    @classmethod
+    def poll(cls, context):
+        return (context.engine in cls.COMPAT_ENGINES)
+
+    def draw_header(self, context):
+        self.layout.prop(context.scene.my_addon, "bool_save_gt_data", text="")
+
+    def draw(self, context):
+        scene = context.scene
+        rd = scene.render
+        layout = self.layout
+
+        my_addon = scene.my_addon
+        layout.active = my_addon.bool_save_gt_data
+
+        layout.use_property_split = False
+        layout.use_property_decorate = False  # No animation.
+
+        # boolean flags to control what is being saved
+        #  reference: https://github.com/sobotka/blender/blob/662d94e020f36e75b9c6b4a258f31c1625573ee8/release/scripts/startup/bl_ui/properties_output.py
+        flow = layout.grid_flow(row_major=True, columns=0, even_columns=True, even_rows=False, align=False)
+        col = flow.column()
+        col.prop(my_addon, "bool_save_depth", text="Depth / Disparity")
+        col = flow.column()
+        col.enabled = context.engine == 'CYCLES' # ref: https://blenderartists.org/t/how-to-disable-a-checkbox-when-a-dropdown-option-is-picked/612801/2
+        col.prop(my_addon, "bool_save_obj_ind", text="Segmentation masks")
+        col = flow.column()
+        col.prop(my_addon, "bool_save_normals", text="Normals")
+        col = flow.column()
+        col.enabled = context.engine == 'CYCLES'
+        col.prop(my_addon, "bool_save_opt_flow", text="Optical Flow")
+        col = flow.column()
+        col.prop(my_addon, "bool_save_obj_poses", text="Objects' Pose")
+        col = flow.column()
+        col.prop(my_addon, "bool_save_cam_param", text="Camara Parameters")
+
+        """ testing a bool """
+        # check if bool property is enabled
+        if (my_addon.bool_save_depth == True):
+            print ("Save depth Enabled")
+        else:
+            print ("Save depth Disabled")
+
+        # Get camera parameters
+        """ show intrinsic parameters """
+        layout.label(text="Intrinsic parameters [pixels]:")
+        f_x, f_y, c_x, c_y = get_camera_parameters_intrinsic(scene)
+
+        box_intr = self.layout.box()
+        col_intr = box_intr.column()
+
+        row_intr_0 = col_intr.split()
+        row_intr_0.label(text=str(f_x))# "{}".format(round(f_x, 3))
+        row_intr_0.label(text='0')
+        row_intr_0.label(text=str(c_x))
+
+        row_intr_1 = col_intr.split()
+        row_intr_1.label(text='0')
+        row_intr_1.label(text=str(f_y))
+        row_intr_1.label(text=str(c_y))
+
+        row_intr_2 = col_intr.split()
+        row_intr_2.label(text='0')
+        row_intr_2.label(text='0')
+        row_intr_2.label(text='1')
+
+        """ show extrinsic parameters """
+        layout.label(text="Extrinsic parameters [pixels]:")
+
+        extr = get_camera_parameters_extrinsic(scene)
+
+        box_ext = self.layout.box()
+        col_ext = box_ext.column()
+
+        row_ext_0 = col_ext.split()
+        row_ext_0.label(text=str(extr[0, 0]))
+        row_ext_0.label(text=str(extr[0, 1]))
+        row_ext_0.label(text=str(extr[0, 2]))
+        row_ext_0.label(text=str(extr[0, 3]))
+
+        row_ext_1 = col_ext.split()
+        row_ext_1.label(text=str(extr[1, 0]))
+        row_ext_1.label(text=str(extr[1, 1]))
+        row_ext_1.label(text=str(extr[1, 2]))
+        row_ext_1.label(text=str(extr[1, 3]))
+
+        row_ext_2 = col_ext.split()
+        row_ext_2.label(text=str(extr[2, 0]))
+        row_ext_2.label(text=str(extr[2, 1]))
+        row_ext_2.label(text=str(extr[2, 2]))
+        row_ext_2.label(text=str(extr[2, 3]))
+
+classes = (
+    RENDER_PT_gt_generator,
+    MyAddonProperties,
+)
+
+def unregister(): # TODO: I do not know what this is useful for
     # unregister the classes
     for cls in classes:
         bpy.utils.unregister_class(cls)
@@ -485,5 +475,13 @@ def unregister():
     # unregister the function being called when rendering each frame
     bpy.app.handlers.render_post.remove(load_handler_after_rend_frame)
 
-if __name__ == "__main__":
-    register()
+if __name__ == "__main__": # only for live edit.
+    from bpy.utils import register_class
+    for cls in classes:
+        register_class(cls)
+    # register the properties
+    bpy.types.Scene.my_addon = PointerProperty(type=MyAddonProperties)
+    # register the function being called when rendering starts
+    bpy.app.handlers.render_init.append(load_handler_render_init)
+    # register the function being called after rendering each frame
+    bpy.app.handlers.render_post.append(load_handler_after_rend_frame)
