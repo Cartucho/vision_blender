@@ -173,15 +173,15 @@ def load_handler_render_init(scene):
         VIEWER_FIXED = False # TODO: change code when https://developer.blender.org/T54314 is fixed
         if scene.render.engine == "CYCLES":
             if VIEWER_FIXED:
-                node_obj_ind = get_or_create_node(tree, "CompositorNodeViewer", "obj_ind")
+                node_segmentation_masks = get_or_create_node(tree, "CompositorNodeViewer", "segmentation_masks")
                 node_opt_flow = get_or_create_node(tree, "CompositorNodeViewer", "opt_flow")
             else:
                 ## create two output nodes
-                node_obj_ind = get_or_create_node(tree, "CompositorNodeOutputFile", "obj_ind")
+                node_segmentation_masks = get_or_create_node(tree, "CompositorNodeOutputFile", "segmentation_masks")
                 node_opt_flow = get_or_create_node(tree, "CompositorNodeOutputFile", "opt_flow")
                 ### set-up their output paths
                 path_render = scene.render.filepath
-                node_obj_ind.base_path = os.path.join(path_render, "obj_ind")
+                node_segmentation_masks.base_path = os.path.join(path_render, "segmentation_masks")
                 node_opt_flow.base_path = os.path.join(path_render, "opt_flow")
 
         # 3. Set-up links between nodes
@@ -196,15 +196,15 @@ def load_handler_render_init(scene):
                 links.new(rl.outputs["Depth"], node_norm_and_z.inputs["Alpha"])
         if scene.render.engine == "CYCLES":
             if VIEWER_FIXED:
-                if not node_obj_ind.inputs["Image"].is_linked:
-                    links.new(rl.outputs["IndexOB"], node_obj_ind.inputs["Image"])
+                if not node_segmentation_masks.inputs["Image"].is_linked:
+                    links.new(rl.outputs["IndexOB"], node_segmentation_masks.inputs["Image"])
                 ## The optical flow needs to be connected to both `Image` and `Alpha`
                 if not node_opt_flow.inputs["Image"].is_linked:
                     links.new(rl.outputs["Vector"], node_opt_flow.inputs["Image"])
                     links.new(rl.outputs["Vector"], node_opt_flow.inputs["Alpha"])
             else:
-                if not node_obj_ind.inputs["Image"].is_linked:
-                    links.new(rl.outputs["IndexOB"], node_obj_ind.inputs["Image"])
+                if not node_segmentation_masks.inputs["Image"].is_linked:
+                    links.new(rl.outputs["IndexOB"], node_segmentation_masks.inputs["Image"])
                 if not node_opt_flow.inputs["Image"].is_linked:
                     links.new(rl.outputs["Vector"], node_opt_flow.inputs["Image"])
 
@@ -299,7 +299,7 @@ def load_handler_after_rend_frame(scene): # TODO: not sure if this is the best p
             pass
         else:
             # TODO
-            #obj_ind_file_path = os.path.join(gt_dir_path, "obj_ind", "Image{}.png".format(5))
+            #segmentation_masks_file_path = os.path.join(gt_dir_path, "segmentation_masks", "Image{}.png".format(5))
             pass
         """ Save data """
         # Blender by default assumes a padding of 4 digits
@@ -340,7 +340,7 @@ class MyAddonProperties(PropertyGroup):
         description = "Save optical flow",
         default = True
         )
-    bool_save_obj_ind : BoolProperty(
+    bool_save_segmentation_masks : BoolProperty(
         name = "Semantic",
         description = "Save semantic segmentation",
         default = True
@@ -392,7 +392,7 @@ class RENDER_PT_gt_generator(GroundTruthGeneratorPanel):
         col.prop(my_addon, "bool_save_depth", text="Depth / Disparity")
         col = flow.column()
         col.enabled = context.engine == 'CYCLES' # ref: https://blenderartists.org/t/how-to-disable-a-checkbox-when-a-dropdown-option-is-picked/612801/2
-        col.prop(my_addon, "bool_save_obj_ind", text="Segmentation masks")
+        col.prop(my_addon, "bool_save_segmentation_masks", text="Segmentation masks")
         col = flow.column()
         col.prop(my_addon, "bool_save_normals", text="Normals")
         col = flow.column()
