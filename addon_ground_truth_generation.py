@@ -17,11 +17,11 @@ import os
 import numpy as np # TODO: check if Blender has numpy by default
 
 import bpy
-from bpy.props import (StringProperty, # TODO: not being used
+from bpy.props import (#StringProperty, # TODO: not being used
                    BoolProperty,
-                   IntProperty, # TODO: not being used
-                   FloatProperty, # TODO: not being used
-                   EnumProperty, # TODO: not being used
+                   #IntProperty, # TODO: not being used
+                   #FloatProperty, # TODO: not being used
+                   #EnumProperty, # TODO: not being used
                    PointerProperty
                    )
 from bpy.types import (Panel,
@@ -30,7 +30,7 @@ from bpy.types import (Panel,
                    )
 from bpy.app.handlers import persistent
 
-
+""" Defining fuctions to obtain ground truth data """
 def get_scene_resolution(scene):
     resolution_scale = (scene.render.resolution_percentage / 100.0)
     resolution_x = scene.render.resolution_x * resolution_scale # [pixels]
@@ -147,6 +147,7 @@ def get_or_create_node(tree, node_type, node_name):
 
 @persistent # TODO: not sure if I should be using @persistent
 def load_handler_render_init(scene):
+    """ This function is called before starting to render """
     # check if user wants to generate the ground truth data
     if scene.vision_blender.bool_save_gt_data:
         #print("Initializing a render job...")
