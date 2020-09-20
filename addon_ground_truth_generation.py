@@ -342,13 +342,15 @@ def load_handler_after_rend_frame(scene): # TODO: not sure if this is the best p
                 z = correct_cycles_depth(z, res_x, res_y, f_x, f_y, c_x, c_y, INVALID_POINT)
         """ Obj Index + Opt flow"""
         VIEWER_FIXED = False # TODO: change code when https://developer.blender.org/T54314 is fixed
-        if VIEWER_FIXED:
-            # TODO: make each Image Viewer active one-by-one and copy values
-            pass
-        else:
-            # TODO
-            #segmentation_masks_file_path = os.path.join(gt_dir_path, "segmentation_masks", "Image{}.png".format(5))
-            pass
+        if scene.render.engine == "CYCLES":
+            if VIEWER_FIXED:
+                # TODO: make each Image Viewer active one-by-one and copy values
+                pass
+            else:
+                # TODO: get data from folders and bring them to a numpy format
+                ## in `load_handler_render_init` we clean these folders, so all the images are output data
+                #segmentation_masks_file_path = os.path.join(gt_dir_path, "segmentation_masks", "Image{}.png".format(5))
+                pass
         """ Save data """
         # Blender by default assumes a padding of 4 digits
         out_path = os.path.join(gt_dir_path, '{:04d}.npz'.format(scene.frame_current))
