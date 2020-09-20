@@ -14,6 +14,7 @@ bl_info = {
 
 import json
 import os
+import shutil # to remove files for Cycles
 import numpy as np # TODO: check if Blender has numpy by default
 
 import bpy
@@ -145,6 +146,20 @@ def get_or_create_node(tree, node_type, node_name):
     return v
 
 
+def clean_folder(folder_path):
+    # ref : https://stackoverflow.com/questions/185936/how-to-delete-the-contents-of-a-folder
+    for filename in os.listdir(folder_path):
+        file_path = os.path.join(folder_path, filename)
+        print(file_path)
+        try:
+            if os.path.isfile(file_path) or os.path.islink(file_path):
+                os.unlink(file_path)
+            elif os.path.isdir(file_path):
+                shutil.rmtree(file_path)
+        except Exception as e:
+                print('Failed to delete %s. Reason: %s' % (file_path, e))
+
+
 @persistent # TODO: not sure if I should be using @persistent
 def load_handler_render_init(scene):
     """ This function is called before starting to render """
@@ -214,12 +229,16 @@ def load_handler_render_init(scene):
                     links.new(rl.outputs["Vector"], node_opt_flow.inputs["Image"])
                 ### set-up their output paths
                 path_render = scene.render.filepath
-                node_segmentation_masks.base_path = os.path.join(path_render, "segmentation_masks")
-                node_opt_flow.base_path = os.path.join(path_render, "opt_flow")
+                segmentation_masks_path = os.path.join(path_render, "segmentation_masks")
+                opt_flow_path = os.path.join(path_render, "opt_flow")
+                node_segmentation_masks.base_path = segmentation_masks_path
+                node_opt_flow.base_path = opt_flow_path
+                ### clean the data in those folders
+                clean_folder(segmentation_masks_path)
+                clean_folder(opt_flow_path)
+
                 ## For the segmentation masks we need to set-up an output image for each pass index
                 ### ref: https://blender.stackexchange.com/questions/18243/how-to-use-index-passes-in-other-compositing-packages
-                # TODO: node_segmentation_masks.layer_slots.remove("Image") # Remove the default `Image` input socket
-                #node_segmentation_masks.inputs.get("Image", None).remove()
                 node_segmentation_masks.layer_slots.clear()
                 for obj in bpy.data.objects:
                     obj_pass_ind = obj.pass_index
