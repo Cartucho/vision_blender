@@ -171,20 +171,6 @@ def load_handler_render_init(scene):
         rl = scene.node_tree.nodes["Render Layers"] # I assumed there is always a Render Layers
         node_norm_and_z = get_or_create_node(tree, "CompositorNodeViewer", "normal_and_zmap")
 
-        VIEWER_FIXED = False # TODO: change code when https://developer.blender.org/T54314 is fixed
-        if scene.render.engine == "CYCLES":
-            if VIEWER_FIXED:
-                node_segmentation_masks = get_or_create_node(tree, "CompositorNodeViewer", "segmentation_masks")
-                node_opt_flow = get_or_create_node(tree, "CompositorNodeViewer", "opt_flow")
-            else:
-                ## create two output nodes
-                node_segmentation_masks = get_or_create_node(tree, "CompositorNodeOutputFile", "segmentation_masks")
-                node_opt_flow = get_or_create_node(tree, "CompositorNodeOutputFile", "opt_flow")
-                ### set-up their output paths
-                path_render = scene.render.filepath
-                node_segmentation_masks.base_path = os.path.join(path_render, "segmentation_masks")
-                node_opt_flow.base_path = os.path.join(path_render, "opt_flow")
-
         # 3. Set-up links between nodes
         ## create new links if necessary
         links = tree.links
@@ -195,19 +181,61 @@ def load_handler_render_init(scene):
         if vision_blender.bool_save_depth:
             if not node_norm_and_z.inputs["Alpha"].is_linked:
                 links.new(rl.outputs["Depth"], node_norm_and_z.inputs["Alpha"])
+
+        # 4. Set-up nodes and links for Cycles only (for optical flow and segmentation masks)
+        """
+            VIEWER_FIXED refers to a Blender bug that does not allow us to access all the data from the script directly,
+                         instead we have to save the data into output pictures and then read the data from those pictures.
+
+                         bug link: https://developer.blender.org/T54314
+
+            Currently, it is also not possible to read all the segmentation_masks in the output image file directly.
+            Therefore, we have to first slipt each of the masks individually and create an output image for each mask.
+            TODO: probably, there is a way to merge all the different masks into a single image.
+        """
+        VIEWER_FIXED = False # TODO: change code when https://developer.blender.org/T54314 is fixed
         if scene.render.engine == "CYCLES":
             if VIEWER_FIXED:
+                # Here I would be creating a viewer for each type of input
+                node_segmentation_masks = get_or_create_node(tree, "CompositorNodeViewer", "segmentation_masks")
                 if not node_segmentation_masks.inputs["Image"].is_linked:
                     links.new(rl.outputs["IndexOB"], node_segmentation_masks.inputs["Image"])
+                # TODO: check, on the viewer node we can read the indexes of each mask directly, so I don't need to split using ID Mask
+                node_opt_flow = get_or_create_node(tree, "CompositorNodeViewer", "opt_flow")
                 ## The optical flow needs to be connected to both `Image` and `Alpha`
                 if not node_opt_flow.inputs["Image"].is_linked:
                     links.new(rl.outputs["Vector"], node_opt_flow.inputs["Image"])
                     links.new(rl.outputs["Vector"], node_opt_flow.inputs["Alpha"])
             else:
-                if not node_segmentation_masks.inputs["Image"].is_linked:
-                    links.new(rl.outputs["IndexOB"], node_segmentation_masks.inputs["Image"])
+                ## create two output nodes
+                node_segmentation_masks = get_or_create_node(tree, "CompositorNodeOutputFile", "segmentation_masks")
+                node_opt_flow = get_or_create_node(tree, "CompositorNodeOutputFile", "opt_flow")
                 if not node_opt_flow.inputs["Image"].is_linked:
                     links.new(rl.outputs["Vector"], node_opt_flow.inputs["Image"])
+                ### set-up their output paths
+                path_render = scene.render.filepath
+                node_segmentation_masks.base_path = os.path.join(path_render, "segmentation_masks")
+                node_opt_flow.base_path = os.path.join(path_render, "opt_flow")
+                ## For the segmentation masks we need to set-up an output image for each pass index
+                ### ref: https://blender.stackexchange.com/questions/18243/how-to-use-index-passes-in-other-compositing-packages
+                # TODO: node_segmentation_masks.layer_slots.remove("Image") # Remove the default `Image` input socket
+                #node_segmentation_masks.inputs.get("Image", None).remove()
+                node_segmentation_masks.layer_slots.clear()
+                for obj in bpy.data.objects:
+                    obj_pass_ind = obj.pass_index
+                    if obj_pass_ind != 0:
+                        print('found one')
+                        ind_str = '{}_'.format(obj_pass_ind)
+                        # TODO: check if that input socket already exists, otherwise create it
+                        socket = node_segmentation_masks.inputs.get(ind_str, None)
+                        if socket is None:
+                            # ref: https://blender.stackexchange.com/questions/65013/not-able-to-add-node-sockets-to-an-existing-node-using-python-scripting
+                            node_segmentation_masks.layer_slots.new(ind_str)
+                            node_id_mask = get_or_create_node(tree, "CompositorNodeIDMask", "{}_mask".format(ind_str))
+                            node_id_mask.index = obj_pass_ind
+                            # create link
+                            links.new(node_id_mask.outputs["Alpha"], node_segmentation_masks.inputs[ind_str])
+                            links.new(rl.outputs["IndexOB"], node_id_mask.inputs["ID value"])
 
         # 4. Save camera_info
         dict_cam_info = {}
