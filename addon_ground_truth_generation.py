@@ -388,13 +388,14 @@ def load_handler_after_rend_frame(scene): # TODO: not sure if this is the best p
         # Blender by default assumes a padding of 4 digits
         out_path = os.path.join(gt_dir_path, '{:04d}.npz'.format(scene.frame_current))
         #print(out_path)
-        np.savez_compressed(out_path,
-                            extrinsic_mat=extrinsic_mat,
-                            normal_map=normal,
-                            depth_map=z,
-                            object_pose_labels=object_pose_labels,
-                            object_pose_mats=object_pose_mats,
-                           )
+        out_dict = {'extrinsic_mat'      : extrinsic_mat,
+                    'normal_map'         : normal,
+                    'depth_map'          : z,
+                    'object_pose_labels' : object_pose_labels,
+                    'object_pose_mats'   : object_pose_mats
+                   }
+        out_dict_filtered = {k: v for k, v in out_dict.items() if v is not None}
+        np.savez_compressed(out_path, **out_dict_filtered)
         # ref: https://stackoverflow.com/questions/35133317/numpy-save-some-arrays-at-once
 
 # classes
