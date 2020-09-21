@@ -125,6 +125,38 @@ def get_camera_parameters_extrinsic(scene):
     return extr
 
 
+def get_objects_pose(scene, extr):
+    poses_labels = []
+    poses = None
+    for obj in bpy.data.objects:
+        """
+            While in blender the (0, 0) coordinate of the rendered image is in the bottom-left,
+            for computer vision we use the top-left. Therefore, we need to multiply the rotation
+            matrix of the object by:
+                 np.array([[1,  0,  0],
+                           [0, -1,  0],
+                           [0,  0, -1]])
+           , which is equivalent to adding a `-` sign in those places below when getting the obj_mat_world.
+        """
+        if obj is scene.camera:
+            # check if the object is not the camera itself
+            continue
+        poses_labels.append(obj.name)
+        mw = obj.matrix_world
+        obj_mat_world = np.array([[ mw[0][0], -mw[0][1], -mw[0][2], mw[0][3]],
+                                  [ mw[1][0], -mw[1][1], -mw[1][2], mw[1][3]],
+                                  [ mw[2][0], -mw[2][1], -mw[2][2], mw[2][3]],
+                                  [        0,         0,         0,        1]])
+        obj_mat_cam = np.matmul(extr, obj_mat_world)
+        if poses is None:
+            poses = obj_mat_cam[None]
+        else:
+            poses = np.vstack((poses, obj_mat_cam[None]))
+    # conver list to array (so that we can save in the npz file)
+    poses_labels = np.array(poses_labels)
+    return poses_labels, poses
+
+
 def correct_cycles_depth(z_map, res_x, res_y, f_x, f_y, c_x, c_y, INVALID_POINT):
     for y in range(res_y):
         b = ((c_y - y) / f_y)
@@ -340,7 +372,7 @@ def load_handler_after_rend_frame(scene): # TODO: not sure if this is the best p
             z[z > max_dist] = INVALID_POINT
             if scene.render.engine == "CYCLES":
                 z = correct_cycles_depth(z, res_x, res_y, f_x, f_y, c_x, c_y, INVALID_POINT)
-        """ Obj Index + Opt flow"""
+        """ Segmentation Masks + Opt flow"""
         VIEWER_FIXED = False # TODO: change code when https://developer.blender.org/T54314 is fixed
         if scene.render.engine == "CYCLES":
             if VIEWER_FIXED:
@@ -351,6 +383,8 @@ def load_handler_after_rend_frame(scene): # TODO: not sure if this is the best p
                 ## in `load_handler_render_init` we clean these folders, so all the images are output data
                 #segmentation_masks_file_path = os.path.join(gt_dir_path, "segmentation_masks", "Image{}.png".format(5))
                 pass
+        """ Objects' pose """
+        object_pose_labels, object_pose_mats = get_objects_pose(scene, extrinsic_mat)
         """ Save data """
         # Blender by default assumes a padding of 4 digits
         out_path = os.path.join(gt_dir_path, '{:04d}.npz'.format(scene.frame_current))
@@ -358,7 +392,9 @@ def load_handler_after_rend_frame(scene): # TODO: not sure if this is the best p
         np.savez_compressed(out_path,
                             extrinsic_mat=extrinsic_mat,
                             normal_map=normal,
-                            depth_map=z
+                            depth_map=z,
+                            object_pose_labels=object_pose_labels,
+                            object_pose_mats=object_pose_mats,
                            )
         # ref: https://stackoverflow.com/questions/35133317/numpy-save-some-arrays-at-once
 
