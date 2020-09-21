@@ -347,11 +347,10 @@ def load_handler_after_rend_frame(scene): # TODO: not sure if this is the best p
         extrinsic_mat = get_camera_parameters_extrinsic(scene)
         ### intrinsic
         f_x, f_y, c_x, c_y = get_camera_parameters_intrinsic(scene)
-        """ Zmap + Normal """
+        """ Depthmap + Normal """
         ## get data
         pixels = bpy.data.images['Viewer Node'].pixels
         #print(len(pixels)) # size = width * height * 4 (rgba)
-        print(len(pixels))
         pixels_numpy = np.array(pixels[:])
         res_x, res_y = get_scene_resolution(scene)
         #   .---> y
