@@ -361,6 +361,7 @@ def load_handler_after_rend_frame(scene): # TODO: not sure if this is the best p
         pixels_numpy.resize((res_y, res_x, 4)) # Numpy works with (y, x, channels)
         normal = pixels_numpy[:, :, 0:3]
         z = None
+        disp = None
         if vision_blender.bool_save_depth:
             z = pixels_numpy[:, :, 3]
             z = np.flip(z, 0) # flip vertically (in Blender y in the image points up instead of down)
@@ -371,6 +372,14 @@ def load_handler_after_rend_frame(scene): # TODO: not sure if this is the best p
             z[z > max_dist] = INVALID_POINT
             if scene.render.engine == "CYCLES":
                 z = correct_cycles_depth(z, res_x, res_y, f_x, f_y, c_x, c_y, INVALID_POINT)
+            # if stereo also calculate disparity
+            cam = scene.camera
+            if (scene.render.use_multiview and
+                cam.data.stereo.convergence_mode == 'PARALLEL' and
+                cam.data.stereo.pivot == 'LEFT'): # TODO: handle the case where the pivot is the right camera
+                baseline_m = cam.data.stereo.interocular_distance # [m]
+                disp = np.zeros_like(z) # disp = 0.0, on the invalid points
+                disp[z != INVALID_POINT] = (baseline_m * f_x) / z[z != INVALID_POINT]
         """ Segmentation Masks + Opt flow"""
         VIEWER_FIXED = False # TODO: change code when https://developer.blender.org/T54314 is fixed
         if scene.render.engine == "CYCLES":
@@ -391,6 +400,7 @@ def load_handler_after_rend_frame(scene): # TODO: not sure if this is the best p
         out_dict = {'extrinsic_mat'      : extrinsic_mat,
                     'normal_map'         : normal,
                     'depth_map'          : z,
+                    'disparity_map'      : disp,
                     'object_pose_labels' : object_pose_labels,
                     'object_pose_mats'   : object_pose_mats
                    }
