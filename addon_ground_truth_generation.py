@@ -509,7 +509,8 @@ class RENDER_PT_gt_generator(GroundTruthGeneratorPanel):
     bl_label = "VisionBlender UI"
     bl_idname = "RENDER_PT_gt_generator"
     COMPAT_ENGINES = {'BLENDER_EEVEE', 'CYCLES'}
-    bl_options = {'DEFAULT_CLOSED'}
+    #bl_options = {'DEFAULT_CLOSED'} # makes panel closed by default
+    #bl_options = {'HIDE_HEADER'} # shows the panel on the top, not collapsable
 
     @classmethod
     def poll(cls, context):
