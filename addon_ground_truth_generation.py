@@ -538,7 +538,7 @@ class RENDER_PT_gt_generator(GroundTruthGeneratorPanel):
         col = flow.column()
         col.prop(vision_blender, "bool_save_cam_param", text="Camara Parameters")
 
-        if vision_blender.bool_save_segmentation_masks:
+        if vision_blender.bool_save_segmentation_masks and context.engine == 'CYCLES':
             obj_ind_found = look_for_obj_index()
             if not obj_ind_found:
                 col = layout.column(align=True)
