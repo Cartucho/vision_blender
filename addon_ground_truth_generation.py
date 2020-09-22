@@ -318,7 +318,7 @@ def load_handler_render_init(scene):
                         node_opt_flow = tree.nodes[node_ind]
                         tree.nodes.remove(node_opt_flow)
 
-        # 4. Save camera_info
+        # 4. Save camera_info (for vision_blender_ros)
         dict_cam_info = {}
         render = scene.render
         cam = scene.camera
@@ -374,9 +374,9 @@ def load_handler_after_rend_frame(scene): # TODO: not sure if this is the best p
         ## update camera - ref: https://blender.stackexchange.com/questions/5636/how-can-i-get-the-location-of-an-object-at-each-keyframe
         scene.frame_set(scene.frame_current) # needed to update the camera position
         ### extrinsic
-        extrinsic_mat = get_camera_parameters_extrinsic(scene)
+        extrinsic_mat = get_camera_parameters_extrinsic(scene) # needed for objects' pose
         ### intrinsic
-        f_x, f_y, c_x, c_y = get_camera_parameters_intrinsic(scene)
+        f_x, f_y, c_x, c_y = get_camera_parameters_intrinsic(scene) # needed for z in Cycles and for disparity
         """ Depthmap + Normal """
         ## get data
         normal = None
@@ -405,6 +405,7 @@ def load_handler_after_rend_frame(scene): # TODO: not sure if this is the best p
                 z[z > max_dist] = INVALID_POINT
                 if scene.render.engine == "CYCLES":
                     z = correct_cycles_depth(z, res_x, res_y, f_x, f_y, c_x, c_y, INVALID_POINT)
+                """ disparity """
                 # if stereo also calculate disparity
                 cam = scene.camera
                 if (scene.render.use_multiview and
@@ -430,6 +431,8 @@ def load_handler_after_rend_frame(scene): # TODO: not sure if this is the best p
         """ Objects' pose """
         object_pose_labels, object_pose_mats = get_objects_pose(scene, extrinsic_mat)
         """ Save data """
+        if not vision_blender.bool_save_cam_param:
+            extrinsic_mat = None
         # Blender by default assumes a padding of 4 digits
         out_path = os.path.join(gt_dir_path, '{:04d}.npz'.format(scene.frame_current))
         #print(out_path)
