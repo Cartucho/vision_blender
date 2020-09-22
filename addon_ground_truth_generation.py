@@ -205,8 +205,9 @@ def load_handler_render_init(scene):
         if vision_blender.bool_save_depth:
             if not scene.view_layers["View Layer"].use_pass_z:
                 scene.view_layers["View Layer"].use_pass_z = True
-        if not scene.view_layers["View Layer"].use_pass_normal:
-            scene.view_layers["View Layer"].use_pass_normal = True
+        if vision_blender.bool_save_normals:
+            if not scene.view_layers["View Layer"].use_pass_normal:
+                scene.view_layers["View Layer"].use_pass_normal = True
         if scene.render.engine == 'CYCLES':
             if not scene.view_layers["View Layer"].use_pass_object_index:
                 scene.view_layers["View Layer"].use_pass_object_index = True
@@ -216,15 +217,17 @@ def load_handler_render_init(scene):
         # 2. Set-up nodes
         tree = scene.node_tree
         rl = scene.node_tree.nodes["Render Layers"] # I assumed there is always a Render Layers
-        node_norm_and_z = get_or_create_node(tree, "CompositorNodeViewer", "normal_and_zmap")
+        if vision_blender.bool_save_normals or vision_blender.bool_save_depth:
+            node_norm_and_z = get_or_create_node(tree, "CompositorNodeViewer", "normal_and_zmap")
 
         # 3. Set-up links between nodes
         ## create new links if necessary
         links = tree.links
         ## Trick: we already have the RGB image so we can connect the Normal to Image
         ##        and the Z to the Alpha channel
-        if not node_norm_and_z.inputs["Image"].is_linked:
-            links.new(rl.outputs["Normal"], node_norm_and_z.inputs["Image"])
+        if vision_blender.bool_save_normals:
+            if not node_norm_and_z.inputs["Image"].is_linked:
+                links.new(rl.outputs["Normal"], node_norm_and_z.inputs["Image"])
         if vision_blender.bool_save_depth:
             if not node_norm_and_z.inputs["Alpha"].is_linked:
                 links.new(rl.outputs["Depth"], node_norm_and_z.inputs["Alpha"])
@@ -349,37 +352,40 @@ def load_handler_after_rend_frame(scene): # TODO: not sure if this is the best p
         f_x, f_y, c_x, c_y = get_camera_parameters_intrinsic(scene)
         """ Depthmap + Normal """
         ## get data
-        pixels = bpy.data.images['Viewer Node'].pixels
-        #print(len(pixels)) # size = width * height * 4 (rgba)
-        pixels_numpy = np.array(pixels[:])
-        res_x, res_y = get_scene_resolution(scene)
-        #   .---> y
-        #   |
-        #   |
-        #   v
-        #    x
-        pixels_numpy.resize((res_y, res_x, 4)) # Numpy works with (y, x, channels)
-        normal = pixels_numpy[:, :, 0:3]
+        normal = None
         z = None
         disp = None
-        if vision_blender.bool_save_depth:
-            z = pixels_numpy[:, :, 3]
-            z = np.flip(z, 0) # flip vertically (in Blender y in the image points up instead of down)
-            # points at infinity get a -1 value
-            max_dist = scene.camera.data.clip_end
-            INVALID_POINT = -1.0
-            normal[z > max_dist] = INVALID_POINT
-            z[z > max_dist] = INVALID_POINT
-            if scene.render.engine == "CYCLES":
-                z = correct_cycles_depth(z, res_x, res_y, f_x, f_y, c_x, c_y, INVALID_POINT)
-            # if stereo also calculate disparity
-            cam = scene.camera
-            if (scene.render.use_multiview and
-                cam.data.stereo.convergence_mode == 'PARALLEL' and
-                cam.data.stereo.pivot == 'LEFT'): # TODO: handle the case where the pivot is the right camera
-                baseline_m = cam.data.stereo.interocular_distance # [m]
-                disp = np.zeros_like(z) # disp = 0.0, on the invalid points
-                disp[z != INVALID_POINT] = (baseline_m * f_x) / z[z != INVALID_POINT]
+        if vision_blender.bool_save_depth or vision_blender.bool_save_normals:
+            pixels = bpy.data.images['Viewer Node'].pixels
+            #print(len(pixels)) # size = width * height * 4 (rgba)
+            pixels_numpy = np.array(pixels[:])
+            res_x, res_y = get_scene_resolution(scene)
+            #   .---> y
+            #   |
+            #   |
+            #   v
+            #    x
+            pixels_numpy.resize((res_y, res_x, 4)) # Numpy works with (y, x, channels)
+            if vision_blender.bool_save_normals:
+                normal = pixels_numpy[:, :, 0:3]
+            if vision_blender.bool_save_depth:
+                z = pixels_numpy[:, :, 3]
+                z = np.flip(z, 0) # flip vertically (in Blender y in the image points up instead of down)
+                # points at infinity get a -1 value
+                max_dist = scene.camera.data.clip_end
+                INVALID_POINT = -1.0
+                #normal[z > max_dist] = INVALID_POINT # TODO: I think this is not necessary, maybe there is another way to see if that normal point is valid?
+                z[z > max_dist] = INVALID_POINT
+                if scene.render.engine == "CYCLES":
+                    z = correct_cycles_depth(z, res_x, res_y, f_x, f_y, c_x, c_y, INVALID_POINT)
+                # if stereo also calculate disparity
+                cam = scene.camera
+                if (scene.render.use_multiview and
+                    cam.data.stereo.convergence_mode == 'PARALLEL' and
+                    cam.data.stereo.pivot == 'LEFT'): # TODO: handle the case where the pivot is the right camera
+                    baseline_m = cam.data.stereo.interocular_distance # [m]
+                    disp = np.zeros_like(z) # disp = 0.0, on the invalid points
+                    disp[z != INVALID_POINT] = (baseline_m * f_x) / z[z != INVALID_POINT]
         """ Segmentation Masks + Opt flow"""
         VIEWER_FIXED = False # TODO: change code when https://developer.blender.org/T54314 is fixed
         if scene.render.engine == "CYCLES":
@@ -498,13 +504,6 @@ class RENDER_PT_gt_generator(GroundTruthGeneratorPanel):
         col.prop(vision_blender, "bool_save_obj_poses", text="Objects' Pose")
         col = flow.column()
         col.prop(vision_blender, "bool_save_cam_param", text="Camara Parameters")
-
-        """ testing a bool """
-        # check if bool property is enabled
-        if (vision_blender.bool_save_depth == True):
-            print ("Save depth Enabled")
-        else:
-            print ("Save depth Disabled")
 
         # Get camera parameters
         """ show intrinsic parameters """
