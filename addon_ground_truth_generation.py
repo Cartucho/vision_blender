@@ -429,7 +429,10 @@ def load_handler_after_rend_frame(scene): # TODO: not sure if this is the best p
                     #segmentation_masks_file_path = os.path.join(gt_dir_path, "segmentation_masks", "Image{}.png".format(5))
                     pass
         """ Objects' pose """
-        object_pose_labels, object_pose_mats = get_objects_pose(scene, extrinsic_mat)
+        object_pose_labels = None
+        object_pose_mats = None
+        if vision_blender.bool_save_obj_poses:
+            object_pose_labels, object_pose_mats = get_objects_pose(scene, extrinsic_mat)
         """ Save data """
         if not vision_blender.bool_save_cam_param:
             extrinsic_mat = None
