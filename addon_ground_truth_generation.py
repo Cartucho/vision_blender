@@ -180,16 +180,17 @@ def get_or_create_node(tree, node_type, node_name):
 
 def clean_folder(folder_path):
     # ref : https://stackoverflow.com/questions/185936/how-to-delete-the-contents-of-a-folder
-    for filename in os.listdir(folder_path):
-        file_path = os.path.join(folder_path, filename)
-        print(file_path)
-        try:
-            if os.path.isfile(file_path) or os.path.islink(file_path):
-                os.unlink(file_path)
-            elif os.path.isdir(file_path):
-                shutil.rmtree(file_path)
-        except Exception as e:
-                print('Failed to delete %s. Reason: %s' % (file_path, e))
+    if os.path.isdir(folder_path):
+        for filename in os.listdir(folder_path):
+            file_path = os.path.join(folder_path, filename)
+            print(file_path)
+            try:
+                if os.path.isfile(file_path) or os.path.islink(file_path):
+                    os.unlink(file_path)
+                elif os.path.isdir(file_path):
+                    shutil.rmtree(file_path)
+            except Exception as e:
+                    print('Failed to delete %s. Reason: %s' % (file_path, e))
 
 
 @persistent # TODO: not sure if I should be using @persistent
@@ -209,10 +210,12 @@ def load_handler_render_init(scene):
             if not scene.view_layers["View Layer"].use_pass_normal:
                 scene.view_layers["View Layer"].use_pass_normal = True
         if scene.render.engine == 'CYCLES':
-            if not scene.view_layers["View Layer"].use_pass_object_index:
-                scene.view_layers["View Layer"].use_pass_object_index = True
-            if not scene.view_layers["View Layer"].use_pass_vector:
-                scene.view_layers["View Layer"].use_pass_vector = True
+            if vision_blender.bool_save_segmentation_masks:
+                if not scene.view_layers["View Layer"].use_pass_object_index:
+                    scene.view_layers["View Layer"].use_pass_object_index = True
+            if vision_blender.bool_save_opt_flow:
+                if not scene.view_layers["View Layer"].use_pass_vector:
+                    scene.view_layers["View Layer"].use_pass_vector = True
 
         # 2. Set-up nodes
         tree = scene.node_tree
@@ -247,49 +250,66 @@ def load_handler_render_init(scene):
         if scene.render.engine == "CYCLES":
             if VIEWER_FIXED:
                 # Here I would be creating a viewer for each type of input
-                node_segmentation_masks = get_or_create_node(tree, "CompositorNodeViewer", "segmentation_masks")
-                if not node_segmentation_masks.inputs["Image"].is_linked:
-                    links.new(rl.outputs["IndexOB"], node_segmentation_masks.inputs["Image"])
-                # TODO: check, on the viewer node we can read the indexes of each mask directly, so I don't need to split using ID Mask
-                node_opt_flow = get_or_create_node(tree, "CompositorNodeViewer", "opt_flow")
-                ## The optical flow needs to be connected to both `Image` and `Alpha`
-                if not node_opt_flow.inputs["Image"].is_linked:
-                    links.new(rl.outputs["Vector"], node_opt_flow.inputs["Image"])
-                    links.new(rl.outputs["Vector"], node_opt_flow.inputs["Alpha"])
+                if vision_blender.bool_save_segmentation_masks:
+                    node_segmentation_masks = get_or_create_node(tree, "CompositorNodeViewer", "segmentation_masks")
+                    if not node_segmentation_masks.inputs["Image"].is_linked:
+                        links.new(rl.outputs["IndexOB"], node_segmentation_masks.inputs["Image"])
+                    # TODO: check, on the viewer node we can read the indexes of each mask directly, so I don't need to split using ID Mask
+                if vision_blender.bool_save_opt_flow:
+                    node_opt_flow = get_or_create_node(tree, "CompositorNodeViewer", "opt_flow")
+                    ## The optical flow needs to be connected to both `Image` and `Alpha`
+                    if not node_opt_flow.inputs["Image"].is_linked:
+                        links.new(rl.outputs["Vector"], node_opt_flow.inputs["Image"])
+                        links.new(rl.outputs["Vector"], node_opt_flow.inputs["Alpha"])
             else:
-                ## create two output nodes
-                node_segmentation_masks = get_or_create_node(tree, "CompositorNodeOutputFile", "segmentation_masks")
-                node_opt_flow = get_or_create_node(tree, "CompositorNodeOutputFile", "opt_flow")
-                if not node_opt_flow.inputs["Image"].is_linked:
-                    links.new(rl.outputs["Vector"], node_opt_flow.inputs["Image"])
-                ### set-up their output paths
                 path_render = scene.render.filepath
                 segmentation_masks_path = os.path.join(path_render, "segmentation_masks")
                 opt_flow_path = os.path.join(path_render, "opt_flow")
-                node_segmentation_masks.base_path = segmentation_masks_path
-                node_opt_flow.base_path = opt_flow_path
-                ### clean the data in those folders
+                """ segmentation masks """
                 clean_folder(segmentation_masks_path)
+                if vision_blender.bool_save_segmentation_masks:
+                    ## create output node
+                    node_segmentation_masks = get_or_create_node(tree, "CompositorNodeOutputFile", "segmentation_masks")
+                    ### set-up the output path
+                    node_segmentation_masks.base_path = segmentation_masks_path
+                    ## For the segmentation masks we need to set-up an output image for each pass index
+                    ### ref: https://blender.stackexchange.com/questions/18243/how-to-use-index-passes-in-other-compositing-packages
+                    node_segmentation_masks.layer_slots.clear()
+                    for obj in bpy.data.objects:
+                        obj_pass_ind = obj.pass_index
+                        if obj_pass_ind != 0:
+                            ind_str = '{}_'.format(obj_pass_ind)
+                            # TODO: check if that input socket already exists, otherwise create it
+                            socket = node_segmentation_masks.inputs.get(ind_str, None)
+                            if socket is None:
+                                # ref: https://blender.stackexchange.com/questions/65013/not-able-to-add-node-sockets-to-an-existing-node-using-python-scripting
+                                node_segmentation_masks.layer_slots.new(ind_str)
+                                node_id_mask = get_or_create_node(tree, "CompositorNodeIDMask", "{}_mask".format(ind_str))
+                                node_id_mask.index = obj_pass_ind
+                                # create link
+                                links.new(node_id_mask.outputs["Alpha"], node_segmentation_masks.inputs[ind_str])
+                                links.new(rl.outputs["IndexOB"], node_id_mask.inputs["ID value"])
+                else:
+                    # if `bool_save_segmentation_masks = False`, then remove node_segmentation_masks
+                    node_ind = tree.nodes.find("segmentation_masks")
+                    if node_ind != -1:
+                        node_segmentation_masks = tree.nodes[node_ind]
+                        tree.nodes.remove(node_segmentation_masks)
+                """ optical flow """
                 clean_folder(opt_flow_path)
-
-                ## For the segmentation masks we need to set-up an output image for each pass index
-                ### ref: https://blender.stackexchange.com/questions/18243/how-to-use-index-passes-in-other-compositing-packages
-                node_segmentation_masks.layer_slots.clear()
-                for obj in bpy.data.objects:
-                    obj_pass_ind = obj.pass_index
-                    if obj_pass_ind != 0:
-                        print('found one')
-                        ind_str = '{}_'.format(obj_pass_ind)
-                        # TODO: check if that input socket already exists, otherwise create it
-                        socket = node_segmentation_masks.inputs.get(ind_str, None)
-                        if socket is None:
-                            # ref: https://blender.stackexchange.com/questions/65013/not-able-to-add-node-sockets-to-an-existing-node-using-python-scripting
-                            node_segmentation_masks.layer_slots.new(ind_str)
-                            node_id_mask = get_or_create_node(tree, "CompositorNodeIDMask", "{}_mask".format(ind_str))
-                            node_id_mask.index = obj_pass_ind
-                            # create link
-                            links.new(node_id_mask.outputs["Alpha"], node_segmentation_masks.inputs[ind_str])
-                            links.new(rl.outputs["IndexOB"], node_id_mask.inputs["ID value"])
+                if vision_blender.bool_save_opt_flow:
+                    ## create output node
+                    node_opt_flow = get_or_create_node(tree, "CompositorNodeOutputFile", "opt_flow")
+                    ### set-up the output path
+                    node_opt_flow.base_path = opt_flow_path
+                    if not node_opt_flow.inputs["Image"].is_linked:
+                        links.new(rl.outputs["Vector"], node_opt_flow.inputs["Image"])
+                else:
+                    # if `bool_save_opt_flow = False`, then remove node_opt_flow
+                    node_ind = tree.nodes.find("opt_flow")
+                    if node_ind != -1:
+                        node_opt_flow = tree.nodes[node_ind]
+                        tree.nodes.remove(node_opt_flow)
 
         # 4. Save camera_info
         dict_cam_info = {}
@@ -387,16 +407,19 @@ def load_handler_after_rend_frame(scene): # TODO: not sure if this is the best p
                     disp = np.zeros_like(z) # disp = 0.0, on the invalid points
                     disp[z != INVALID_POINT] = (baseline_m * f_x) / z[z != INVALID_POINT]
         """ Segmentation Masks + Opt flow"""
-        VIEWER_FIXED = False # TODO: change code when https://developer.blender.org/T54314 is fixed
-        if scene.render.engine == "CYCLES":
-            if VIEWER_FIXED:
-                # TODO: make each Image Viewer active one-by-one and copy values
-                pass
-            else:
-                # TODO: get data from folders and bring them to a numpy format
-                ## in `load_handler_render_init` we clean these folders, so all the images are output data
-                #segmentation_masks_file_path = os.path.join(gt_dir_path, "segmentation_masks", "Image{}.png".format(5))
-                pass
+        if vision_blender.bool_save_segmentation_masks or vision_blender.bool_save_opt_flow:
+            VIEWER_FIXED = False # TODO: change code when https://developer.blender.org/T54314 is fixed
+            if scene.render.engine == "CYCLES":
+                if VIEWER_FIXED:
+                    # TODO: make each Image Viewer active one-by-one and copy values
+                    pass
+                else:
+                    #if vision_blender.bool_save_segmentation_masks:
+                    #if vision_blender.bool_save_opt_flow:
+                    # TODO: get data from folders and bring them to a numpy format
+                    ## in `load_handler_render_init` we clean these folders, so all the images are output data
+                    #segmentation_masks_file_path = os.path.join(gt_dir_path, "segmentation_masks", "Image{}.png".format(5))
+                    pass
         """ Objects' pose """
         object_pose_labels, object_pose_mats = get_objects_pose(scene, extrinsic_mat)
         """ Save data """
