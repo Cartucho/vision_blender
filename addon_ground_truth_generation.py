@@ -193,6 +193,13 @@ def clean_folder(folder_path):
                     print('Failed to delete %s. Reason: %s' % (file_path, e))
 
 
+def look_for_obj_index():
+    for obj in bpy.data.objects:
+        if obj.pass_index != 0:
+            return True
+    return False
+
+
 @persistent # TODO: not sure if I should be using @persistent
 def load_handler_render_init(scene):
     """ This function is called before starting to render """
@@ -527,6 +534,12 @@ class RENDER_PT_gt_generator(GroundTruthGeneratorPanel):
         col.prop(vision_blender, "bool_save_obj_poses", text="Objects' Pose")
         col = flow.column()
         col.prop(vision_blender, "bool_save_cam_param", text="Camara Parameters")
+
+        if vision_blender.bool_save_segmentation_masks:
+            obj_ind_found = look_for_obj_index()
+            if not obj_ind_found:
+                col = layout.column(align=True)
+                col.label(text="No object index found yet...", icon='ERROR')
 
         # Get camera parameters
         """ show intrinsic parameters """
