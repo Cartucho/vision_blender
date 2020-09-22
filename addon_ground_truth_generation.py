@@ -434,12 +434,18 @@ def load_handler_after_rend_frame(scene): # TODO: not sure if this is the best p
         if vision_blender.bool_save_obj_poses:
             object_pose_labels, object_pose_mats = get_objects_pose(scene, extrinsic_mat)
         """ Save data """
+        intrinsic_mat = None
         if not vision_blender.bool_save_cam_param:
             extrinsic_mat = None
+        else:
+            intrinsic_mat = np.array([[f_x,   0,  c_x],
+                             [  0, f_y,  c_y],
+                             [  0,   0,    1]])
         # Blender by default assumes a padding of 4 digits
         out_path = os.path.join(gt_dir_path, '{:04d}.npz'.format(scene.frame_current))
         #print(out_path)
-        out_dict = {'extrinsic_mat'      : extrinsic_mat,
+        out_dict = {'intrinsic_mat'      : intrinsic_mat,
+                    'extrinsic_mat'      : extrinsic_mat,
                     'normal_map'         : normal,
                     'depth_map'          : z,
                     'disparity_map'      : disp,
