@@ -395,6 +395,7 @@ def load_handler_after_rend_frame(scene): # TODO: not sure if this is the best p
             pixels_numpy.resize((res_y, res_x, 4)) # Numpy works with (y, x, channels)
             if vision_blender.bool_save_normals:
                 normal = pixels_numpy[:, :, 0:3]
+                normal = np.flip(normal, 0) # flip vertically (in Blender y in the image points up instead of down)
             if vision_blender.bool_save_depth:
                 z = pixels_numpy[:, :, 3]
                 z = np.flip(z, 0) # flip vertically (in Blender y in the image points up instead of down)
@@ -637,7 +638,18 @@ classes = (
     MyAddonProperties,
 )
 
-def unregister(): # TODO: I do not know what this is useful for
+def register():
+    from bpy.utils import register_class
+    for cls in classes:
+        register_class(cls)
+    # register the properties
+    bpy.types.Scene.vision_blender = PointerProperty(type=MyAddonProperties)
+    # register the function being called when rendering starts
+    bpy.app.handlers.render_init.append(load_handler_render_init)
+    # register the function being called after rendering each frame
+    bpy.app.handlers.render_post.append(load_handler_after_rend_frame)
+
+def unregister():
     # unregister the classes
     for cls in classes:
         bpy.utils.unregister_class(cls)
@@ -649,12 +661,4 @@ def unregister(): # TODO: I do not know what this is useful for
     bpy.app.handlers.render_post.remove(load_handler_after_rend_frame)
 
 if __name__ == "__main__": # only for live edit.
-    from bpy.utils import register_class
-    for cls in classes:
-        register_class(cls)
-    # register the properties
-    bpy.types.Scene.vision_blender = PointerProperty(type=MyAddonProperties)
-    # register the function being called when rendering starts
-    bpy.app.handlers.render_init.append(load_handler_render_init)
-    # register the function being called after rendering each frame
-    bpy.app.handlers.render_post.append(load_handler_after_rend_frame)
+    register()
