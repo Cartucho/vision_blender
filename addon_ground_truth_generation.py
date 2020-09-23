@@ -422,11 +422,14 @@ def load_handler_after_rend_frame(scene): # TODO: not sure if this is the best p
                     # TODO: make each Image Viewer active one-by-one and copy values
                     pass
                 else:
+                    # in `load_handler_render_init` and at each rendering frame we clean these folders, so all the images are output data
+                    # TODO: this part of the code is really slow, essentially I am opening the images one by one, so many segmentation masks would make it even slower
                     seg_masks = None
                     if vision_blender.bool_save_segmentation_masks:
-                        seg_masks_path = os.path.join(gt_dir_path, "segmentation_masks")
+                        seg_masks_path = os.path.join(gt_dir_path, 'segmentation_masks')
                         for tmp_file in os.listdir(seg_masks_path):
                             #scene.node_tree.nodes['segmentation_masks'].format.file_format == 'PNG'
+                            #bpy.path.extensions_image
                             if tmp_file.endswith(".png"): # TODO: change depending on Blender's default format?
                                 if seg_masks is None:
                                     seg_masks = np.zeros((res_y, res_x), dtype=np.uint16)
@@ -440,9 +443,18 @@ def load_handler_after_rend_frame(scene): # TODO: not sure if this is the best p
                                 tmp_seg_mask = np.flip(tmp_seg_mask, 0) # flip vertically (in Blender y in the image points up instead of down)
                                 seg_masks[tmp_seg_mask != 0] = obj_pass_ind
                                 os.remove(img_path)
-                    #if vision_blender.bool_save_opt_flow:
-                    # TODO: get data from folders and bring them to a numpy format
-                    ## in `load_handler_render_init` we clean these folders, so all the images are output data
+                    opt_flw = None
+                    if vision_blender.bool_save_opt_flow:
+                        opt_flw_path = os.path.join(gt_dir_path, "opt_flow")
+                        for tmp_file in os.listdir(opt_flw_path):
+                            #bpy.path.extensions_image
+                            if tmp_file.endswith(".png"): # TODO: change depending on Blender's default format?
+                                img_path = os.path.join(opt_flw_path, tmp_file)
+                                tmp_img = bpy.data.images.load(img_path)
+                                opt_flw = np.array(tmp_img.pixels[:])
+                                opt_flw.resize((res_y, res_x, 4)) # Numpy works with (y, x, channels)
+                                opt_flw = np.flip(opt_flw, 0) # flip vertically (in Blender y in the image points up instead of down)
+                                os.remove(img_path)
         """ Objects' pose """
         object_pose_labels = None
         object_pose_mats = None
@@ -459,7 +471,8 @@ def load_handler_after_rend_frame(scene): # TODO: not sure if this is the best p
         # Blender by default assumes a padding of 4 digits
         out_path = os.path.join(gt_dir_path, '{:04d}.npz'.format(scene.frame_current))
         #print(out_path)
-        out_dict = {'segmentation_masks' : seg_masks,
+        out_dict = {'optical_flow'       : opt_flw,
+                    'segmentation_masks' : seg_masks,
                     'intrinsic_mat'      : intrinsic_mat,
                     'extrinsic_mat'      : extrinsic_mat,
                     'normal_map'         : normal,
