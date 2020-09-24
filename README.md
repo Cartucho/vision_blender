@@ -13,7 +13,11 @@ You should now be able to find the `VisionBlender UI` in th bottom of the `Outpu
 
 ## How to generate ground truth data?
 
-Simply tick the boxes of what you want to render.
+Simply tick the boxes of what you want to save as ground truth in the `VisionBlender UI`.
+Then start rendering and the outputs will be generated automatically.
+To render you click `Render > Render Image` or `Render > Render Animation...`, alternatively you can click `F12` for image and `Ctrl F12` for animation.
+
+You can change the output path in `Output Properties > Output > Output Path`.
 
 Note: `Segmentation masks` and `Optical flow` are only available in Cycles.
 
@@ -21,6 +25,10 @@ Note: `Segmentation masks` and `Optical flow` are only available in Cycles.
 
 To set-up the segmentation masks you need to choose a pass index for each object:
     `Object Properties > Relations > Pass Index`
+
+#### Optical flow ####
+
+You will only have optical flow if the camera or the objects are moving during an animation.
 
 ### How to read the data after generating it?
 
