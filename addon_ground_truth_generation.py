@@ -416,6 +416,8 @@ def load_handler_after_rend_frame(scene): # TODO: not sure if this is the best p
                     disp = np.zeros_like(z) # disp = 0.0, on the invalid points
                     disp[z != INVALID_POINT] = (baseline_m * f_x) / z[z != INVALID_POINT]
         """ Segmentation Masks + Opt flow"""
+        seg_masks = None
+        opt_flw = None
         if vision_blender.bool_save_segmentation_masks or vision_blender.bool_save_opt_flow:
             VIEWER_FIXED = False # TODO: change code when https://developer.blender.org/T54314 is fixed
             if scene.render.engine == "CYCLES":
@@ -425,7 +427,6 @@ def load_handler_after_rend_frame(scene): # TODO: not sure if this is the best p
                 else:
                     # in `load_handler_render_init` and at each rendering frame we clean these folders, so all the images are output data
                     # TODO: this part of the code is really slow, essentially I am opening the images one by one, so many segmentation masks would make it even slower
-                    seg_masks = None
                     if vision_blender.bool_save_segmentation_masks:
                         seg_masks_path = os.path.join(gt_dir_path, 'segmentation_masks')
                         for tmp_file in os.listdir(seg_masks_path):
@@ -444,7 +445,6 @@ def load_handler_after_rend_frame(scene): # TODO: not sure if this is the best p
                                 tmp_seg_mask = np.flip(tmp_seg_mask, 0) # flip vertically (in Blender y in the image points up instead of down)
                                 seg_masks[tmp_seg_mask != 0] = obj_pass_ind
                                 os.remove(img_path)
-                    opt_flw = None
                     if vision_blender.bool_save_opt_flow:
                         opt_flw_path = os.path.join(gt_dir_path, "opt_flow")
                         for tmp_file in os.listdir(opt_flw_path):
