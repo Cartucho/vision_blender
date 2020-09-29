@@ -1,6 +1,12 @@
 # vision_blender
 
-A Blender addon to generate synthetic ground truth data (benchmarks) for Computer Vision applications.
+[![GitHub stars](https://img.shields.io/github/stars/Cartucho/vision_blender.svg?style=social&label=Stars)](https://github.com/Cartucho/vision_blender)
+
+A Blender user-interface to generate synthetic ground truth data (benchmarks) for Computer Vision applications.
+
+<img src="https://imperialcollegelondon.box.com/s/fhfo30ixgqgpk2dlkcz16xpoa01uld4i" width="40%">
+
+<img src="https://imperialcollegelondon.box.com/s/17lejlo3vgkacn3bsy8z81rc37u16f26" width="30%">
 
 ## Installation
 
