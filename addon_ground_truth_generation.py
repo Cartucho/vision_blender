@@ -492,7 +492,7 @@ class MyAddonProperties(PropertyGroup):
     bool_save_gt_data : BoolProperty(
         name = "Ground truth",
         description = "Save ground truth data",
-        default = True,
+        default = False,
         )
     bool_save_depth : BoolProperty(
         name = "Depth",
