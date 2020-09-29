@@ -4,9 +4,9 @@
 
 A Blender user-interface to generate synthetic ground truth data (benchmarks) for Computer Vision applications.
 
-<img src="https://user-images.githubusercontent.com/15831541/94527156-7b944d80-022e-11eb-85bd-0b387fd519fb.png" width="40%">
+<img src="https://user-images.githubusercontent.com/15831541/94527156-7b944d80-022e-11eb-85bd-0b387fd519fb.png" width="100%">
 
-<img src="https://user-images.githubusercontent.com/15831541/94527180-8353f200-022e-11eb-9bf5-5ebd6102bc9f.png" width="30%">
+<img src="https://user-images.githubusercontent.com/15831541/94527180-8353f200-022e-11eb-9bf5-5ebd6102bc9f.png" width="100%">
 
 ## Installation
 
