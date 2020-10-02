@@ -6,6 +6,13 @@ data = np.load('0001.npz')
 if 'intrinsic_mat' in data.files:
     intrinsic_mat = data['intrinsic_mat']
     print("\tCamera intrinsic mat:\n{}\n".format(intrinsic_mat))
+    """
+    f_x = intrinsic_mat[0, 0]
+    f_y = intrinsic_mat[1, 1]
+    c_x = intrinsic_mat[0, 2]
+    c_y = intrinsic_mat[1, 2]
+    print('f_x:{} f_y:{} c_x:{} c_y:{}'.format(f_x, f_y, c_x, c_y))
+    """
 
 if 'extrinsic_mat' in data.files:
     extrinsic_mat = data['extrinsic_mat']
