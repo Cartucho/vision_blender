@@ -15,11 +15,22 @@ if 'object_pose_labels' in data.files and 'object_pose_mats' in data.files:
     obj_pose_labels = data['object_pose_labels']
     obj_pose_mats = data['object_pose_mats']
     obj_poses = [{'obj_name': i, 'obj_pose_mat': j} for i, j in zip(obj_pose_labels, obj_pose_mats)]
-    print("\tObject poses:")
+    print('\tObject poses:')
     for obj in obj_poses:
         print(obj['obj_name'])
         print(obj['obj_pose_mat'])
-
+        """ Get 2d coordinate of object """
+        if 'intrinsic_mat' in data.files:
+            t_x, t_y, t_z = obj['obj_pose_mat'][:,3]
+            #print('t_x:[{}] t_y:[{}] t_z:[{}]'.format(t_x, t_y, t_z))
+            point_3d = np.array([[t_x],
+                                 [t_y],
+                                 [t_z]])
+            #print(point_3d)
+            point_2d_scaled = np.matmul(intrinsic_mat, point_3d)
+            point_2d = point_2d_scaled / point_2d_scaled[2]
+            point_2d = point_2d[:2]
+            print('u:{} v:{}'.format(point_2d[0], point_2d[1]))
 try:
     import cv2
 
