@@ -15,7 +15,10 @@ if 'object_pose_labels' in data.files and 'object_pose_mats' in data.files:
     obj_pose_labels = data['object_pose_labels']
     obj_pose_mats = data['object_pose_mats']
     obj_poses = [{'obj_name': i, 'obj_pose_mat': j} for i, j in zip(obj_pose_labels, obj_pose_mats)]
-    print("\tObject poses:\n{}\n".format(obj_poses))
+    print("\tObject poses:")
+    for obj in obj_poses:
+        print(obj['obj_name'])
+        print(obj['obj_pose_mat'])
 
 try:
     import cv2
