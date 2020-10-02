@@ -36,8 +36,8 @@ if 'object_pose_labels' in data.files and 'object_pose_mats' in data.files:
             #print(point_3d)
             point_2d_scaled = np.matmul(intrinsic_mat, point_3d)
             point_2d = point_2d_scaled / point_2d_scaled[2]
-            point_2d = point_2d[:2]
-            print('u:{} v:{}'.format(point_2d[0], point_2d[1]))
+            u, v = point_2d[:2]
+            print('u:{} v:{}'.format(u, v))
 try:
     import cv2
 
