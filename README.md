@@ -8,6 +8,8 @@ A Blender user-interface to generate synthetic ground truth data (benchmarks) fo
 
 <img src="https://user-images.githubusercontent.com/15831541/94527180-8353f200-022e-11eb-9bf5-5ebd6102bc9f.png" width="100%">
 
+VisionBlender is a synthetic computer vision dataset generator that adds a user interface to Blender, allowing users to generate monocular/stereo video sequences with ground truth maps of depth, disparity, segmentation masks, surface normals, optical flow, object pose, and camera parameters.
+
 ## Installation
 
 To install the addon simply go to `Edit > Preferences > Add-on tab > Install an add-on`
