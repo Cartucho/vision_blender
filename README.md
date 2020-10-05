@@ -45,3 +45,20 @@ You will only have optical flow if the camera or the objects are moving during a
 
 You simply have to load the numpy arrays from thr `.npz` files.
 Go to the `vision_blender/samples` and have a look at the example there!
+
+## Paper
+
+This work received the best paper award at a MICCAI 2020 workshop!
+
+Note: The paper was not released in the journal yet but if you email me I can send it to you.
+
+If you use this tool please consider citing our paper:
+
+```bibtex
+@article{joao2020visionblender,
+  Author = {Joao Cartucho, Samyakh Tukra, Yunpeng Li, Daniel S. Elson, Stamatia Giannarou},
+  Journal = {Computer Methods in Biomechanics and Biomedical Engineering: Imaging & Visualization},
+  Title = {VisionBlender: A Tool to Efficiently Generate Computer Vision Datasets for Robotic Surgery},
+  Year = {2020}
+}
+```
