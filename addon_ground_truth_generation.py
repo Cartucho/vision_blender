@@ -200,6 +200,15 @@ def look_for_obj_index():
     return False
 
 
+def get_img_extension(file_format):
+    if file_format == 'PNG':
+        return '.png'
+    elif file_format == 'JPEG':
+        return '.jpg'
+    # TODO: test other formats
+    #bpy.path.extensions_image
+
+
 @persistent # TODO: not sure if I should be using @persistent
 def load_handler_render_init(scene):
     """ This function is called before starting to render """
@@ -382,11 +391,11 @@ def load_handler_after_rend_frame(scene): # TODO: not sure if this is the best p
         normal = None
         z = None
         disp = None
+        res_x, res_y = get_scene_resolution(scene)
         if vision_blender.bool_save_depth or vision_blender.bool_save_normals:
             pixels = bpy.data.images['Viewer Node'].pixels
             #print(len(pixels)) # size = width * height * 4 (rgba)
             pixels_numpy = np.array(pixels[:])
-            res_x, res_y = get_scene_resolution(scene)
             #   .---> y
             #   |
             #   |
@@ -429,10 +438,10 @@ def load_handler_after_rend_frame(scene): # TODO: not sure if this is the best p
                     # TODO: this part of the code is really slow, essentially I am opening the images one by one, so many segmentation masks would make it even slower
                     if vision_blender.bool_save_segmentation_masks:
                         seg_masks_path = os.path.join(gt_dir_path, 'segmentation_masks')
+                        file_format = scene.node_tree.nodes['segmentation_masks'].format.file_format
+                        extension = get_img_extension(file_format)
                         for tmp_file in os.listdir(seg_masks_path):
-                            #scene.node_tree.nodes['segmentation_masks'].format.file_format == 'PNG'
-                            #bpy.path.extensions_image
-                            if tmp_file.endswith(".png"): # TODO: change depending on Blender's default format?
+                            if tmp_file.endswith(extension):
                                 if seg_masks is None:
                                     seg_masks = np.zeros((res_y, res_x), dtype=np.uint16)
                                 img_path = os.path.join(seg_masks_path, tmp_file)
@@ -447,9 +456,11 @@ def load_handler_after_rend_frame(scene): # TODO: not sure if this is the best p
                                 os.remove(img_path)
                     if vision_blender.bool_save_opt_flow:
                         opt_flw_path = os.path.join(gt_dir_path, "opt_flow")
+                        file_format = scene.node_tree.nodes['opt_flow'].format.file_format
+                        extension = get_img_extension(file_format)
                         for tmp_file in os.listdir(opt_flw_path):
                             #bpy.path.extensions_image
-                            if tmp_file.endswith(".png"): # TODO: change depending on Blender's default format?
+                            if tmp_file.endswith(extension):
                                 img_path = os.path.join(opt_flw_path, tmp_file)
                                 tmp_img = bpy.data.images.load(img_path)
                                 opt_flw = np.array(tmp_img.pixels[:])
