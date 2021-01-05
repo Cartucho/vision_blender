@@ -578,7 +578,7 @@ class RENDER_PT_gt_generator(GroundTruthGeneratorPanel):
         col.prop(vision_blender, "bool_save_depth", text="Depth / Disparity")
         col = flow.column()
         col.enabled = context.engine == 'CYCLES' # ref: https://blenderartists.org/t/how-to-disable-a-checkbox-when-a-dropdown-option-is-picked/612801/2
-        col.prop(vision_blender, "bool_save_segmentation_masks", text="Segmentation masks")
+        col.prop(vision_blender, "bool_save_segmentation_masks", text="Segmentation Masks")
         col = flow.column()
         col.prop(vision_blender, "bool_save_normals", text="Normals")
         col = flow.column()
@@ -589,11 +589,15 @@ class RENDER_PT_gt_generator(GroundTruthGeneratorPanel):
         col = flow.column()
         col.prop(vision_blender, "bool_save_cam_param", text="Camera Parameters")
 
+        if context.engine != 'CYCLES':
+            col = layout.column(align=True)
+            col.label(text="Optical Flow and Segmentation Masks requires Cycles!", icon='ERROR')
+
         if vision_blender.bool_save_segmentation_masks and context.engine == 'CYCLES':
             obj_ind_found = look_for_obj_index()
             if not obj_ind_found:
                 col = layout.column(align=True)
-                col.label(text="No object index found yet...", icon='ERROR')
+                col.label(text="No object index found yet for Segmentation Masks...", icon='ERROR')
 
         # Get camera parameters
         """ show intrinsic parameters """
