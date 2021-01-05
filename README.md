@@ -50,15 +50,17 @@ Go to the `vision_blender/samples` and have a look at the example there!
 
 This work received the best paper award at a MICCAI 2020 workshop!
 
-Note: The paper was not released in the journal yet but if you email me I can send it to you.
+The paper can be found at [this link](https://www.tandfonline.com/doi/full/10.1080/21681163.2020.1835546)
 
 If you use this tool please consider citing our paper:
 
 ```bibtex
-@article{joao2020visionblender,
-  Author = {Joao Cartucho, Samyakh Tukra, Yunpeng Li, Daniel S. Elson, Stamatia Giannarou},
-  Journal = {Computer Methods in Biomechanics and Biomedical Engineering: Imaging & Visualization},
-  Title = {VisionBlender: A Tool to Efficiently Generate Computer Vision Datasets for Robotic Surgery},
-  Year = {2020}
+@article{cartucho2020visionblender,
+  title={VisionBlender: a tool to efficiently generate computer vision datasets for robotic surgery},
+  author={Cartucho, Jo{\~a}o and Tukra, Samyakh and Li, Yunpeng and S. Elson, Daniel and Giannarou, Stamatia},
+  journal={Computer Methods in Biomechanics and Biomedical Engineering: Imaging \& Visualization},
+  pages={1--8},
+  year={2020},
+  publisher={Taylor \& Francis}
 }
 ```
