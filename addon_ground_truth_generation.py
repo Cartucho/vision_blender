@@ -125,33 +125,16 @@ def get_camera_parameters_extrinsic(scene):
     return extr
 
 
-def get_objects_pose(scene, extr):
+def get_objects_pose(scene):
     poses_labels = []
     poses = None
     for obj in bpy.data.objects:
-        """
-            While in blender the (0, 0) coordinate of the rendered image is in the bottom-left,
-            for computer vision we use the top-left. Therefore, we need to multiply the rotation
-            matrix of the object by:
-                 np.array([[1,  0,  0],
-                           [0, -1,  0],
-                           [0,  0, -1]])
-           , which is equivalent to adding a `-` sign in those places below when getting the obj_mat_world.
-        """
-        if obj is scene.camera:
-            # check if the object is not the camera itself
-            continue
         poses_labels.append(obj.name)
-        mw = obj.matrix_world
-        obj_mat_world = np.array([[ mw[0][0], -mw[0][1], -mw[0][2], mw[0][3]],
-                                  [ mw[1][0], -mw[1][1], -mw[1][2], mw[1][3]],
-                                  [ mw[2][0], -mw[2][1], -mw[2][2], mw[2][3]],
-                                  [        0,         0,         0,        1]])
-        obj_mat_cam = np.matmul(extr, obj_mat_world)
+        mw = np.asarray(obj.matrix_world)
         if poses is None:
-            poses = obj_mat_cam[None]
+            poses = mw[None]
         else:
-            poses = np.vstack((poses, obj_mat_cam[None]))
+            poses = np.vstack((poses, mw[None]))
     # conver list to array (so that we can save in the npz file)
     poses_labels = np.array(poses_labels)
     return poses_labels, poses
@@ -471,7 +454,7 @@ def load_handler_after_rend_frame(scene): # TODO: not sure if this is the best p
         object_pose_labels = None
         object_pose_mats = None
         if vision_blender.bool_save_obj_poses:
-            object_pose_labels, object_pose_mats = get_objects_pose(scene, extrinsic_mat)
+            object_pose_labels, object_pose_mats = get_objects_pose(scene)
         """ Save data """
         intrinsic_mat = None
         if not vision_blender.bool_save_cam_param:
