@@ -29,7 +29,6 @@ from bpy.types import (Panel,
                    Operator,
                    PropertyGroup
                    )
-from bpy.app.handlers import persistent
 
 """ Defining fuctions to obtain ground truth data """
 def get_scene_resolution(scene):
@@ -192,7 +191,6 @@ def get_img_extension(file_format):
     #bpy.path.extensions_image
 
 
-@persistent # TODO: not sure if I should be using @persistent
 def load_handler_render_init(scene):
     """ This function is called before starting to render """
     # check if user wants to generate the ground truth data
@@ -351,7 +349,6 @@ def load_handler_render_init(scene):
             json.dump(dict_cam_info, tmp_file)
 
 
-@persistent # TODO: not sure if I should be using @persistent
 def load_handler_after_rend_frame(scene): # TODO: not sure if this is the best place to put this function, should it be above the classes?
     """ This script runs after rendering each frame """
     # ref: https://blenderartists.org/t/how-to-run-script-on-every-frame-in-blender-render/699404/2
