@@ -190,6 +190,8 @@ def get_img_extension(file_format):
         return '.jpg'
     elif file_format == 'TARGA':
         return '.tga'
+    elif file_format == 'OPEN_EXR':
+        return '.exr'
     # TODO: test other formats
     #bpy.path.extensions_image
 
@@ -303,7 +305,8 @@ def load_handler_render_init(scene):
                     ## create output node
                     node_opt_flow = get_or_create_node(tree, "CompositorNodeOutputFile", "opt_flow")
                     ### set-up the output img format
-                    node_opt_flow.format.file_format = 'TARGA'
+                    node_opt_flow.format.file_format = 'OPEN_EXR'
+                    node_opt_flow.format.exr_codec = 'PIZ'
                     ### set-up the output path
                     node_opt_flow.base_path = opt_flow_path
                     if not node_opt_flow.inputs["Image"].is_linked:
