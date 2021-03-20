@@ -30,6 +30,7 @@ from bpy.types import (Panel,
                    PropertyGroup
                    )
 
+
 """ Defining fuctions to obtain ground truth data """
 def get_scene_resolution(scene):
     resolution_scale = (scene.render.resolution_percentage / 100.0)
@@ -187,6 +188,8 @@ def get_img_extension(file_format):
         return '.png'
     elif file_format == 'JPEG':
         return '.jpg'
+    elif file_format == 'TARGA':
+        return '.tga'
     # TODO: test other formats
     #bpy.path.extensions_image
 
@@ -267,6 +270,8 @@ def load_handler_render_init(scene):
                 if vision_blender.bool_save_segmentation_masks:
                     ## create output node
                     node_segmentation_masks = get_or_create_node(tree, "CompositorNodeOutputFile", "segmentation_masks")
+                    ### set-up the output img format
+                    node_segmentation_masks.format.file_format = 'TARGA'
                     ### set-up the output path
                     node_segmentation_masks.base_path = segmentation_masks_path
                     ## For the segmentation masks we need to set-up an output image for each pass index
@@ -297,6 +302,8 @@ def load_handler_render_init(scene):
                 if vision_blender.bool_save_opt_flow:
                     ## create output node
                     node_opt_flow = get_or_create_node(tree, "CompositorNodeOutputFile", "opt_flow")
+                    ### set-up the output img format
+                    node_opt_flow.format.file_format = 'TARGA'
                     ### set-up the output path
                     node_opt_flow.base_path = opt_flow_path
                     if not node_opt_flow.inputs["Image"].is_linked:
