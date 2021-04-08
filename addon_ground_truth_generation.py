@@ -365,7 +365,7 @@ def load_handler_after_rend_frame(scene): # TODO: not sure if this is the best p
     # check if user wants to generate the ground truth data
     if scene.vision_blender.bool_save_gt_data:
         vision_blender = scene.vision_blender
-        gt_dir_path = scene.render.filepath
+        gt_dir_path = os.path.dirname(scene.render.filepath)
         #print(gt_dir_path)
         # save ground truth data
         #print(scene.frame_current)
