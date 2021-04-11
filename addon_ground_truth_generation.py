@@ -660,9 +660,9 @@ def unregister():
         bpy.utils.unregister_class(cls)
     # unregister the properties
     del bpy.types.Scene.vision_blender
-    # unregister the function being called when rendering each frame
+    # unregister the function being called when rendering starts
     bpy.app.handlers.render_init.remove(load_handler_render_init)
-    # unregister the function being called when rendering each frame
+    # unregister the function being called after rendering each frame
     bpy.app.handlers.render_post.remove(load_handler_after_rend_frame)
 
 if __name__ == "__main__": # only for live edit.
