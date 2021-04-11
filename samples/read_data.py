@@ -21,28 +21,31 @@ if 'extrinsic_mat' in data.files:
 if 'object_pose_labels' in data.files and 'object_pose_mats' in data.files:
     obj_pose_labels = data['object_pose_labels']
     obj_pose_mats = data['object_pose_mats']
-    obj_poses = [{'obj_name': i, 'obj_pose_mat': j} for i, j in zip(obj_pose_labels, obj_pose_mats)]
+    obj_poses = [{'obj_name': i, 'obj_pose_mat': j[:3,:]} for i, j in zip(obj_pose_labels, obj_pose_mats)]
     print('\tObject poses:')
     for obj in obj_poses:
         print(obj['obj_name'])
         print(obj['obj_pose_mat'])
-        """ Get 2d coordinate of object """
-        if ('intrinsic_mat' in data.files) and ('extrinsic_mat' in data.files):
-            point_3d = obj['obj_pose_mat'][:,3]
-            point_3d_cam = np.matmul(extrinsic_mat, point_3d)
-            print(point_3d)
-            print(point_3d_cam)
-            point_2d_scaled = np.matmul(intrinsic_mat, point_3d_cam[:3])
-            if point_2d_scaled[2] != 0:
-                point_2d = point_2d_scaled / point_2d_scaled[2]
-                u, v = point_2d[:2]
-                print(' 2D image projection u:{} v:{}'.format(u, v))
+        if obj['obj_name'] != 'Light':
+            """ Get 2d coordinate of object """
+            if ('intrinsic_mat' in data.files) and ('extrinsic_mat' in data.files):
+                point_3d = obj['obj_pose_mat'][:,3]
+                point_3d_homog = np.append(point_3d, [1.0])
+                point_3d_cam = np.matmul(extrinsic_mat, point_3d_homog)
+                point_2d_scaled = np.matmul(intrinsic_mat, point_3d_cam)
+                if point_2d_scaled[2] != 0:
+                    point_2d = point_2d_scaled / point_2d_scaled[2]
+                    u, v = point_2d[:2]
+                    print(' 2D image projection u:{} v:{}'.format(u, v))
 try:
     import cv2
 
     if 'optical_flow' in data.files:
         opt_flow = data['optical_flow']
-        cv2.imshow("Optical flow", opt_flow)
+        height, width = opt_flow.shape[:2]
+        opt_flow_next = np.zeros((height, width, 3), dtype=np.float64)
+        opt_flow_next[:,:,:2] = opt_flow[:,:,:2]
+        cv2.imshow("Optical flow", opt_flow_next)
 
     if 'normal_map' in data.files:
         normals = data['normal_map']
