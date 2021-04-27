@@ -28,7 +28,9 @@ Simply tick the boxes of what you want to save as ground truth in the `VisionBle
 Then start rendering and the outputs will be generated automatically.
 To render you click `Render > Render Image` or `Render > Render Animation...`, alternatively you can click `F12` for image and `Ctrl F12` for animation.
 
-You can change the output path in `Output Properties > Output > Output Path`.
+Change the output path in `Output Properties > Output > Output Path`.
+
+The ground-truth maps are always calculated using meters [m] as unit of distance.
 
 Note: `Segmentation masks` and `Optical flow` are only available in Cycles.
 
