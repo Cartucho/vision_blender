@@ -349,7 +349,7 @@ def load_handler_render_init(scene):
             ### stereo mode
             stereo_info['stereo_mode'] = cam.data.stereo.convergence_mode
             ### stereo interocular distance
-            stereo_info['stereo_interocular_distance'] = cam.data.stereo.interocular_distance
+            stereo_info['stereo_interocular_distance [m]'] = cam.data.stereo.interocular_distance
             ### stereo pivot
             stereo_info['stereo_pivot'] = cam.data.stereo.pivot
             dict_cam_info['stereo_info'] = stereo_info
