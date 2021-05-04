@@ -267,7 +267,8 @@ def load_handler_render_init(scene):
             else:
                 path_render = scene.render.filepath
                 segmentation_masks_path = os.path.join(path_render, "segmentation_masks")
-                opt_flow_path = os.path.join(path_render, "opt_flow")
+                opt_flow_curr_to_prev_path = os.path.join(path_render, 'opt_flow_curr_to_prev')
+                opt_flow_curr_to_next_path = os.path.join(path_render, "opt_flow_curr_to_next")
                 """ segmentation masks """
                 clean_folder(segmentation_masks_path)
                 if vision_blender.bool_save_segmentation_masks:
@@ -301,23 +302,47 @@ def load_handler_render_init(scene):
                         node_segmentation_masks = tree.nodes[node_ind]
                         tree.nodes.remove(node_segmentation_masks)
                 """ optical flow """
-                clean_folder(opt_flow_path)
+                clean_folder(opt_flow_curr_to_prev_path)
+                clean_folder(opt_flow_curr_to_next_path)
                 if vision_blender.bool_save_opt_flow:
-                    ## create output node
-                    node_opt_flow = get_or_create_node(tree, "CompositorNodeOutputFile", "opt_flow")
-                    ### set-up the output img format
-                    node_opt_flow.format.file_format = 'OPEN_EXR'
-                    node_opt_flow.format.exr_codec = 'PIZ'
-                    ### set-up the output path
-                    node_opt_flow.base_path = opt_flow_path
-                    if not node_opt_flow.inputs["Image"].is_linked:
-                        links.new(rl.outputs["Vector"], node_opt_flow.inputs["Image"])
+                    ## create output nodes
+                    node_opt_flow_curr_to_prev = get_or_create_node(tree, 'CompositorNodeOutputFile', 'opt_flow_curr_to_prev')
+                    if not node_opt_flow_curr_to_prev.inputs['Image'].is_linked:
+                        ### set-up the output img format
+                        node_opt_flow_curr_to_prev.format.file_format = 'OPEN_EXR'
+                        node_opt_flow_curr_to_prev.format.exr_codec = 'PIZ'
+                        ### set-up the output path
+                        node_opt_flow_curr_to_prev.base_path = opt_flow_curr_to_prev_path
+                        node_rg_separate = get_or_create_node(tree, "CompositorNodeSepRGBA", "RG_sep")
+                        node_rg_combine = get_or_create_node(tree, "CompositorNodeCombRGBA", "RG_comb")
+                        links.new(rl.outputs["Vector"], node_rg_separate.inputs["Image"])
+                        links.new(node_rg_separate.outputs["R"], node_rg_combine.inputs["R"])
+                        links.new(node_rg_separate.outputs["G"], node_rg_combine.inputs["G"])
+                        links.new(node_rg_combine.outputs['Image'], node_opt_flow_curr_to_prev.inputs['Image'])
+                    node_opt_flow_curr_to_next = get_or_create_node(tree, 'CompositorNodeOutputFile', 'opt_flow_curr_to_next')
+                    if not node_opt_flow_curr_to_next.inputs['Image'].is_linked:
+                        ### set-up the output img format
+                        node_opt_flow_curr_to_next.format.file_format = 'OPEN_EXR'
+                        node_opt_flow_curr_to_next.format.exr_codec = 'PIZ'
+                        ### set-up the output path
+                        node_opt_flow_curr_to_next.base_path = opt_flow_curr_to_next_path
+                        node_rg_separate = get_or_create_node(tree, "CompositorNodeSepRGBA", "RG_sep")
+                        node_rg_combine = get_or_create_node(tree, "CompositorNodeCombRGBA", "RG_comb")
+                        links.new(rl.outputs["Vector"], node_rg_separate.inputs["Image"])
+                        links.new(node_rg_separate.outputs["B"], node_rg_combine.inputs["R"])
+                        links.new(node_rg_separate.outputs["A"], node_rg_combine.inputs["G"])
+                        links.new(node_rg_combine.outputs['Image'], node_opt_flow_curr_to_next.inputs['Image'])
                 else:
                     # if `bool_save_opt_flow = False`, then remove node_opt_flow
-                    node_ind = tree.nodes.find("opt_flow")
+                    node_ind = tree.nodes.find("opt_flow_curr_to_prev")
                     if node_ind != -1:
                         node_opt_flow = tree.nodes[node_ind]
                         tree.nodes.remove(node_opt_flow)
+                    node_ind = tree.nodes.find("opt_flow_curr_to_next")
+                    if node_ind != -1:
+                        node_opt_flow = tree.nodes[node_ind]
+                        tree.nodes.remove(node_opt_flow)
+
 
         # 4. Save camera_info (for vision_blender_ros)
         dict_cam_info = {}
@@ -416,9 +441,12 @@ def load_handler_after_rend_frame(scene): # TODO: not sure if this is the best p
                     baseline_m = cam.data.stereo.interocular_distance # [m]
                     disp = np.zeros_like(z) # disp = 0.0, on the invalid points
                     disp[z != INVALID_POINT] = (baseline_m * f_x) / z[z != INVALID_POINT]
+
+
         """ Segmentation Masks + Opt flow"""
         seg_masks = None
-        opt_flw = None
+        opt_flw_curr_to_prev = None
+        opt_flw_curr_to_next = None
         if vision_blender.bool_save_segmentation_masks or vision_blender.bool_save_opt_flow:
             VIEWER_FIXED = False # TODO: change code when https://developer.blender.org/T54314 is fixed
             if scene.render.engine == "CYCLES":
@@ -447,17 +475,39 @@ def load_handler_after_rend_frame(scene): # TODO: not sure if this is the best p
                                 seg_masks[tmp_seg_mask != 0] = obj_pass_ind
                                 os.remove(img_path)
                     if vision_blender.bool_save_opt_flow:
-                        opt_flw_path = os.path.join(gt_dir_path, "opt_flow")
-                        file_format = scene.node_tree.nodes['opt_flow'].format.file_format
+                        opt_flw_path_curr_to_prev = os.path.join(gt_dir_path, 'opt_flow_curr_to_prev')
+                        file_format = scene.node_tree.nodes['opt_flow_curr_to_prev'].format.file_format
                         extension = get_img_extension(file_format)
-                        for tmp_file in os.listdir(opt_flw_path):
+                        for tmp_file in os.listdir(opt_flw_path_curr_to_prev):
                             #bpy.path.extensions_image
                             if tmp_file.endswith(extension):
-                                img_path = os.path.join(opt_flw_path, tmp_file)
+                                img_path = os.path.join(opt_flw_path_curr_to_prev, tmp_file)
                                 tmp_img = bpy.data.images.load(img_path)
-                                opt_flw = np.array(tmp_img.pixels[:])
-                                opt_flw.resize((res_y, res_x, 4)) # Numpy works with (y, x, channels)
-                                opt_flw = np.flip(opt_flw, 0) # flip vertically (in Blender y in the image points up instead of down)
+                                #tmp_img.alpha_mode = 'STRAIGHT'
+                                opt_flw_curr_to_prev = np.array(tmp_img.pixels[:])
+                                opt_flw_curr_to_prev.resize((res_y, res_x, 4)) # Numpy works with (y, x, channels)
+                                # In Blender y is up instead of down, so the y optical flow should be -
+                                opt_flw_curr_to_prev[:,:,1] = - opt_flw_curr_to_prev[:,:,1] # channel 1 - y optical flow
+                                opt_flw_curr_to_prev = np.flip(opt_flw_curr_to_prev, 0) # flip vertically (in Blender y in the image points up instead of down)
+                                os.remove(img_path)
+                        opt_flw_path_curr_to_next = os.path.join(gt_dir_path, 'opt_flow_curr_to_next')
+                        file_format = scene.node_tree.nodes['opt_flow_curr_to_next'].format.file_format
+                        extension = get_img_extension(file_format)
+                        for tmp_file in os.listdir(opt_flw_path_curr_to_next):
+                            #bpy.path.extensions_image
+                            if tmp_file.endswith(extension):
+                                img_path = os.path.join(opt_flw_path_curr_to_next, tmp_file)
+                                tmp_img = bpy.data.images.load(img_path)
+                                #tmp_img.alpha_mode = 'STRAIGHT'
+                                opt_flw_curr_to_next = np.array(tmp_img.pixels[:])
+                                opt_flw_curr_to_next.resize((res_y, res_x, 4)) # Numpy works with (y, x, channels)
+                                # In Blender y is up instead of down, so the y optical flow should be -
+                                opt_flw_curr_to_next[:,:,1] = - opt_flw_curr_to_next[:,:,1] # channel 1 - y optical flow
+                                opt_flw_curr_to_next = np.flip(opt_flw_curr_to_next, 0) # flip vertically (in Blender y in the image points up instead of down)
+                                # However, I want forward flow (from current to next frame) instead of backward (next frame to current)
+                                # so I invert the optical flow both in x and y
+                                opt_flw_curr_to_next[:,:,0] = - opt_flw_curr_to_next[:,:,0]
+                                opt_flw_curr_to_next[:,:,1] = - opt_flw_curr_to_next[:,:,1]
                                 os.remove(img_path)
         """ Objects' pose """
         object_pose_labels = None
@@ -475,7 +525,8 @@ def load_handler_after_rend_frame(scene): # TODO: not sure if this is the best p
         # Blender by default assumes a padding of 4 digits
         out_path = os.path.join(gt_dir_path, '{:04d}.npz'.format(scene.frame_current))
         #print(out_path)
-        out_dict = {'optical_flow'       : opt_flw,
+        out_dict = {'optical_flow_curr_to_prev'       : opt_flw_curr_to_prev,
+                    'optical_flow_curr_to_next'       : opt_flw_curr_to_next,
                     'segmentation_masks' : seg_masks,
                     'intrinsic_mat'      : intrinsic_mat,
                     'extrinsic_mat'      : extrinsic_mat,
