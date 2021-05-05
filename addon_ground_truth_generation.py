@@ -466,13 +466,15 @@ def load_handler_after_rend_frame(scene): # TODO: not sure if this is the best p
                                 #tmp_img.alpha_mode = 'STRAIGHT'
                                 opt_flw = np.array(tmp_img.pixels[:])
                                 opt_flw.resize((res_y, res_x, 4)) # Numpy works with (y, x, channels)
+                                opt_flw = opt_flw[:,:,:2] # We are only interested in the first two channels
                                 opt_flw = np.flip(opt_flw, 0) # flip vertically (in Blender y in the image points up instead of down)
                                 # In Blender y is up instead of down, so the y optical flow should be -
-                                #opt_flw[:,:,1] = - opt_flw[:,:,1] # channel 1 - y optical flow
+                                #opt_flw[:,:,1] = np.negative(opt_flw[:,:,1]) # channel 1 - y optical flow
                                 # However, I want forward flow (from current to next frame) instead of backward (next frame to current)
                                 # so I invert the optical flow both in x and y
-                                opt_flw[:,:,0] = - opt_flw[:,:,0]
-                                #opt_flw[:,:,1] = - opt_flw[:,:,1] # Doing the `-` twice is the same as not doing
+                                opt_flw[:,:,0] = np.negative(opt_flw[:,:,0])
+                                #opt_flw[:,:,1] = np.negative(opt_flw[:,:,1]) # Doing the `-` twice is the same as not doing
+
                                 os.remove(img_path)
         """ Objects' pose """
         object_pose_labels = None

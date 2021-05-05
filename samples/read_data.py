@@ -1,7 +1,11 @@
 import numpy as np
 
+
 data = np.load('0001.npz')
 #print(data.files)
+
+path_img = '0001.png'
+path_img_next = '0002.png'
 
 if 'intrinsic_mat' in data.files:
     intrinsic_mat = data['intrinsic_mat']
@@ -38,25 +42,46 @@ if 'object_pose_labels' in data.files and 'object_pose_mats' in data.files:
                     u, v = point_2d[:2]
                     print(' 2D image projection u:{} v:{}'.format(u, v))
 try:
-    import cv2
+    import cv2 as cv
+
 
     if 'optical_flow' in data.files:
         opt_flow = data['optical_flow']
-        height, width = opt_flow.shape[:2]
-        opt_flow_next = np.zeros((height, width, 3), dtype=np.float64)
-        opt_flow_next[:,:,:2] = opt_flow[:,:,:2]
-        cv2.imshow("Optical flow", opt_flow_next)
+
+        img = cv.imread(path_img)
+        img_next = cv.imread(path_img_next)
+        # Alpha blending images (so that we can see both at the same time)
+        ## The next frame will appear like a ghost after the current frame
+        dst = cv.addWeighted(img, 0.75, img_next, 0.25, 0)
+
+        # Draw optical flow - with arrows
+        gap_pixels = 15
+        rows, cols = dst.shape[:2]
+        arrows = np.zeros_like(dst)
+        for v in range(gap_pixels, rows, gap_pixels):
+            for u in range(gap_pixels, cols, gap_pixels):
+                flow_tmp = opt_flow[v, u]
+                pt1 = (u, v)
+                pt2 = (u + int(round(flow_tmp[0])), v + int(round(flow_tmp[1])))
+                cv.arrowedLine(arrows,
+                               pt1=pt1,
+                               pt2=pt2,
+                               color=(0, 255, 0),
+                               thickness=1, 
+                               tipLength=.03)
+        dst = cv.addWeighted(dst, 1.00, arrows, 0.25, 0)
+        cv.imshow('From current to next - arrows', dst)
 
     if 'normal_map' in data.files:
         normals = data['normal_map']
-        cv2.imshow("Surface normals", normals)
+        cv.imshow("Surface normals", normals)
 
     if 'segmentation_masks' in data.files:
         sg_msk = data['segmentation_masks']
         height, width = sg_msk.shape
         sg_msk_img = np.zeros((height, width, 3), np.uint8)
         sg_msk_img[sg_msk == 1] = [255, 0, 0] # Draw in blue where `obj_ind = 1`
-        cv2.imshow("Segmentation masks", sg_msk_img)
+        cv.imshow("Segmentation masks", sg_msk_img)
 
     if 'depth_map' in data.files:
         depth = data['depth_map']
@@ -72,13 +97,13 @@ try:
         """
         depth_copy = np.copy(depth)
         depth_copy[depth == INVALID_DEPTH] = depth_min
-        normalized_depth = cv2.normalize(depth_copy, None, 0, 255, cv2.NORM_MINMAX, dtype=cv2.CV_8UC1) # alternatively use CV_8UC3
+        normalized_depth = cv.normalize(depth_copy, None, 0, 255, cv.NORM_MINMAX, dtype=cv.CV_8UC1) # alternatively use CV_8UC3
         #"""
         #normalized_depth = 255.0 - normalized_depth # invert values for draw
-        depth_colored = cv2.applyColorMap(normalized_depth, cv2.COLORMAP_JET)
+        depth_colored = cv.applyColorMap(normalized_depth, cv.COLORMAP_JET)
         depth_colored[depth == INVALID_DEPTH] = [0, 0, 0] # paint in black the regions with invalid depth
-        cv2.imshow("Depth map", depth_colored)
+        cv.imshow("Depth map", depth_colored)
 
-    cv2.waitKey(0)
+    cv.waitKey(0)
 except ImportError:
     print("\"opencv-python\" not found, please install to visualize the rest of the results.")
