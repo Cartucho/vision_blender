@@ -27,24 +27,40 @@ You should now be able to find the `VisionBlender UI` in the bottom of the `Outp
 
 ## How to generate ground truth data?
 
-Simply tick the boxes of what you want to save as ground truth in the `VisionBlender UI`.
-Then start rendering and the outputs will be generated automatically.
-To render you click `Render > Render Image` or `Render > Render Animation...`, alternatively you can click `F12` for image and `Ctrl F12` for animation.
+### 1. Select render engine
 
-Change the output path in `Output Properties > Output > Output Path`.
+If you want to get ground truth `Segmentation masks` or `Optical flow` you need first to set blender to use the `Cycles` Render Engine. Otherwise, use `Eevee` (it will be faster!) which is set by default.
 
-The ground-truth maps are always calculated using meters [m] as unit of distance.
+<img src="https://media.giphy.com/media/s87Yo48JPQITTzVnbl/giphy.gif" width="50%">
 
-Note: `Segmentation masks` and `Optical flow` are only available in Cycles.
+##### How to set-up segmentation masks? #####
 
-#### Segmentation masks ####
-
-To set-up the segmentation masks you need to choose a pass index for each object:
+To set-up the segmentation masks you need to choose a pass index other than zero (!= 0) for each object:
     `Object Properties > Relations > Pass Index`
 
-#### Optical flow ####
+<img src="https://media.giphy.com/media/FLL3LQWg1x01efAc1e/giphy.gif" width="50%">
 
-You will only have optical flow if the camera or the objects are moving during an animation.
+Each integer (e.g., `Pass Index = 1`) represents a class of objects to be segmented.
+
+##### How to set-up optical flow? #####
+
+You will only have optical flow if the camera or the objects are moving during an animation. In the following gif, I show you an example of how to move an object between frames:
+
+<img src="https://media.giphy.com/media/N77idgOsPjkxbk5tfd/giphy.gif" width="50%">
+
+### 2. Set output path
+
+Set up the output path in `Output Properties > Output > Output Path`. This is the path where both your rendered images and ground truth will be saved.
+
+<img src="https://media.giphy.com/media/pkonIVp8o8slvsC3Nf/giphy.gif" width="50%">
+
+### 3. Select ground truth maps and render
+
+First, tick the boxes of what you want to save as ground truth in the `VisionBlender UI`. Then, start rendering. To start rendering you click `Render > Render Image` or `Render > Render Animation...`, alternatively you can click `F12` for image and `Ctrl F12` for animation.
+
+<img src="https://media.giphy.com/media/evpNpfJMYzwEyaHeQG/giphy.gif" width="50%">
+
+Note: The ground-truth maps are always calculated using meters [m] as unit of distance.
 
 ### How to read the data after generating it?
 
