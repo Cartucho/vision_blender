@@ -18,7 +18,7 @@ VisionBlender is a synthetic computer vision dataset generator that adds a user 
 To install the addon simply go to `Edit > Preferences > Add-on tab > Install an add-on`
 , then select the file `path/to/vision_blender/addon_ground_truth_generation.py` and click `Install Add-on`.
 
-<img src="https://media.giphy.com/media/8hi33WFpulQgNS0aKZ/giphy.gif" width="100%">
+<img src="https://media.giphy.com/media/8hi33WFpulQgNS0aKZ/giphy.gif" width="50%">
 
 Finally you have to enable the add-on; Search `VisionBlender` and tick the check-box.
 You should now be able to find the `VisionBlender UI` in th bottom of the `Output Properties`.
