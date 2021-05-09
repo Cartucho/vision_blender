@@ -65,7 +65,7 @@ Note: The ground-truth maps are always calculated using meters [m] as unit of di
 ### How to read the data after generating it?
 
 You simply have to load the numpy arrays from thr `.npz` files.
-Go to the `vision_blender/samples` and have a look at the example there!
+Go to [vision_blender/samples](https://github.com/Cartucho/vision_blender/tree/master/samples) and have a look at the example there!
 
 ## Paper
 

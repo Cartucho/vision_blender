@@ -70,7 +70,7 @@ try:
                                thickness=1, 
                                tipLength=.03)
         dst = cv.addWeighted(dst, 1.00, arrows, 0.25, 0)
-        cv.imshow('From current to next - arrows', dst)
+        cv.imshow('Optical Flow: From current to next - arrows', dst)
 
     if 'normal_map' in data.files:
         normals = data['normal_map']
