@@ -265,7 +265,7 @@ def load_handler_render_init(scene):
                         links.new(rl.outputs["Vector"], node_opt_flow.inputs["Image"])
                         links.new(rl.outputs["Vector"], node_opt_flow.inputs["Alpha"])
             else:
-                path_render = scene.render.filepath
+                path_render = os.path.dirname(scene.render.filepath)
                 segmentation_masks_path = os.path.join(path_render, "segmentation_masks")
                 opt_flow_path = os.path.join(path_render, "opt_flow")
                 """ segmentation masks """
@@ -359,7 +359,7 @@ def load_handler_render_init(scene):
             stereo_info['stereo_pivot'] = cam.data.stereo.pivot
             dict_cam_info['stereo_info'] = stereo_info
         ## save data to a json file
-        gt_dir_path = scene.render.filepath
+        gt_dir_path = os.path.dirname(scene.render.filepath)
         out_path = os.path.join(gt_dir_path, 'camera_info.json')
         with open(out_path, 'w') as tmp_file:
             json.dump(dict_cam_info, tmp_file)
