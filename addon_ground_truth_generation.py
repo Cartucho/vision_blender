@@ -168,6 +168,12 @@ def get_or_create_node(tree, node_type, node_name):
     return v
 
 
+def remove_old_vision_blender_nodes(tree):
+    for node in tree.nodes:
+        if 'vision_blender' in node.name:
+            tree.nodes.remove(node)
+
+
 def clean_folder(folder_path):
     # ref : https://stackoverflow.com/questions/185936/how-to-delete-the-contents-of-a-folder
     if os.path.isdir(folder_path):
@@ -229,9 +235,10 @@ def load_handler_render_init(scene):
 
         # 2. Set-up nodes
         tree = scene.node_tree
+        remove_old_vision_blender_nodes(tree) # Clean nodes from previous rendering
         rl = scene.node_tree.nodes["Render Layers"] # I assumed there is always a Render Layers
         if vision_blender.bool_save_normals or vision_blender.bool_save_depth:
-            node_norm_and_z = get_or_create_node(tree, "CompositorNodeViewer", "normal_and_zmap")
+            node_norm_and_z = get_or_create_node(tree, "CompositorNodeViewer", "normal_and_zmap_vision_blender")
 
         # 3. Set-up links between nodes
         ## create new links if necessary
@@ -261,27 +268,27 @@ def load_handler_render_init(scene):
             if VIEWER_FIXED:
                 # Here I would be creating a viewer for each type of input
                 if vision_blender.bool_save_segmentation_masks:
-                    node_segmentation_masks = get_or_create_node(tree, "CompositorNodeViewer", "segmentation_masks")
+                    node_segmentation_masks = get_or_create_node(tree, "CompositorNodeViewer", "segmentation_masks_vision_blender")
                     if not node_segmentation_masks.inputs["Image"].is_linked:
                         links.new(rl.outputs["IndexOB"], node_segmentation_masks.inputs["Image"])
                     # TODO: check, on the viewer node we can read the indexes of each mask directly, so I don't need to split using ID Mask
                 if vision_blender.bool_save_opt_flow:
-                    node_opt_flow = get_or_create_node(tree, "CompositorNodeViewer", "opt_flow")
+                    node_opt_flow = get_or_create_node(tree, "CompositorNodeViewer", "opt_flow_vision_blender")
                     ## The optical flow needs to be connected to both `Image` and `Alpha`
                     if not node_opt_flow.inputs["Image"].is_linked:
                         links.new(rl.outputs["Vector"], node_opt_flow.inputs["Image"])
                         links.new(rl.outputs["Vector"], node_opt_flow.inputs["Alpha"])
             else:
                 path_render = os.path.dirname(scene.render.filepath)
-                segmentation_masks_path = os.path.join(path_render, "segmentation_masks")
-                opt_flow_path = os.path.join(path_render, "opt_flow")
+                segmentation_masks_path = os.path.join(path_render, "segmentation_masks_vision_blender")
+                opt_flow_path = os.path.join(path_render, "opt_flow_vision_blender")
                 """ segmentation masks """
                 clean_folder(segmentation_masks_path)
                 if vision_blender.bool_save_segmentation_masks:
                     obj_ind_found = look_for_obj_index() # Check if there are any object with object index set
                     if obj_ind_found:
                         ## create output node
-                        node_segmentation_masks = get_or_create_node(tree, "CompositorNodeOutputFile", "segmentation_masks")
+                        node_segmentation_masks = get_or_create_node(tree, "CompositorNodeOutputFile", "segmentation_masks_vision_blender")
                         ### set-up the output img format
                         node_segmentation_masks.format.file_format = 'TARGA'
                         ### set-up the output path
@@ -299,36 +306,36 @@ def load_handler_render_init(scene):
                                 if socket is None:
                                     # ref: https://blender.stackexchange.com/questions/65013/not-able-to-add-node-sockets-to-an-existing-node-using-python-scripting
                                     node_segmentation_masks.layer_slots.new(ind_str)
-                                    node_id_mask = get_or_create_node(tree, "CompositorNodeIDMask", "{}_mask".format(ind_str))
+                                    node_id_mask = get_or_create_node(tree, "CompositorNodeIDMask", "{}_mask_vision_blender".format(ind_str))
                                     node_id_mask.index = obj_pass_ind
                                     # create link
                                     links.new(node_id_mask.outputs["Alpha"], node_segmentation_masks.inputs[ind_str])
                                     links.new(rl.outputs["IndexOB"], node_id_mask.inputs["ID value"])
                 else:
                     # if `bool_save_segmentation_masks = False`, then remove node_segmentation_masks
-                    node_ind = tree.nodes.find("segmentation_masks")
+                    node_ind = tree.nodes.find("segmentation_masks_vision_blender")
                     if node_ind != -1:
                         node_segmentation_masks = tree.nodes[node_ind]
                         tree.nodes.remove(node_segmentation_masks)
                 """ optical flow - Current to next frame """
                 clean_folder(opt_flow_path)
                 if vision_blender.bool_save_opt_flow:
-                    node_opt_flow = get_or_create_node(tree, 'CompositorNodeOutputFile', 'opt_flow')
+                    node_opt_flow = get_or_create_node(tree, 'CompositorNodeOutputFile', 'opt_flow_vision_blender')
                     if not node_opt_flow.inputs['Image'].is_linked:
                         ### set-up the output img format
                         node_opt_flow.format.file_format = 'OPEN_EXR'
                         node_opt_flow.format.exr_codec = 'PIZ'
                         ### set-up the output path
                         node_opt_flow.base_path = opt_flow_path
-                        node_rg_separate = get_or_create_node(tree, "CompositorNodeSepRGBA", "RG_sep")
-                        node_rg_combine = get_or_create_node(tree, "CompositorNodeCombRGBA", "RG_comb")
+                        node_rg_separate = get_or_create_node(tree, "CompositorNodeSepRGBA", "BA_sep_vision_blender")
+                        node_rg_combine = get_or_create_node(tree, "CompositorNodeCombRGBA", "RG_comb_vision_blender")
                         links.new(rl.outputs["Vector"], node_rg_separate.inputs["Image"])
                         links.new(node_rg_separate.outputs["B"], node_rg_combine.inputs["R"])
                         links.new(node_rg_separate.outputs["A"], node_rg_combine.inputs["G"])
                         links.new(node_rg_combine.outputs['Image'], node_opt_flow.inputs['Image'])
                 else:
                     # if `bool_save_opt_flow = False`, then remove node_opt_flow
-                    node_ind = tree.nodes.find("opt_flow")
+                    node_ind = tree.nodes.find("opt_flow_vision_blender")
                     if node_ind != -1:
                         node_opt_flow = tree.nodes[node_ind]
                         tree.nodes.remove(node_opt_flow)
@@ -447,8 +454,8 @@ def load_handler_after_rend_frame(scene): # TODO: not sure if this is the best p
                     # TODO: this part of the code is really slow, essentially I am opening the images one by one, so many segmentation masks would make it even slower
                     if vision_blender.bool_save_segmentation_masks:
                         # check if node exists
-                        if check_if_node_exists(scene.node_tree, 'segmentation_masks'):
-                            seg_masks_node = scene.node_tree.nodes['segmentation_masks']
+                        if check_if_node_exists(scene.node_tree, 'segmentation_masks_vision_blender'):
+                            seg_masks_node = scene.node_tree.nodes['segmentation_masks_vision_blender']
                             seg_masks_path = seg_masks_node.base_path
                             file_format = seg_masks_node.format.file_format
                             extension = get_img_extension(file_format)
@@ -467,10 +474,11 @@ def load_handler_after_rend_frame(scene): # TODO: not sure if this is the best p
                                         tmp_seg_mask = np.flip(tmp_seg_mask, 0) # flip vertically (in Blender y in the image points up instead of down)
                                         seg_masks[tmp_seg_mask != 0] = obj_pass_ind
                                         os.remove(img_path)
+                                os.rmdir(seg_masks_path)
                     if vision_blender.bool_save_opt_flow:
                         """ Forward optical flow - from current to next frame """
-                        if check_if_node_exists(scene.node_tree, 'opt_flow'):
-                            opt_flw_node = scene.node_tree.nodes['opt_flow']
+                        if check_if_node_exists(scene.node_tree, 'opt_flow_vision_blender'):
+                            opt_flw_node = scene.node_tree.nodes['opt_flow_vision_blender']
                             opt_flw_path = opt_flw_node.base_path
                             file_format = opt_flw_node.format.file_format
                             extension = get_img_extension(file_format)
@@ -493,6 +501,7 @@ def load_handler_after_rend_frame(scene): # TODO: not sure if this is the best p
                                         #opt_flw[:,:,1] = np.negative(opt_flw[:,:,1]) # Doing the `-` twice is the same as not doing
 
                                         os.remove(img_path)
+                                os.rmdir(opt_flw_path)
         """ Objects' pose """
         object_pose_labels = None
         object_pose_mats = None
