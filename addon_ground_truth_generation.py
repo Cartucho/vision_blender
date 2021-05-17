@@ -450,7 +450,7 @@ def load_handler_after_rend_frame(scene): # TODO: not sure if this is the best p
                         if check_if_node_exists(scene.node_tree, 'segmentation_masks'):
                             seg_masks_node = scene.node_tree.nodes['segmentation_masks']
                             seg_masks_path = seg_masks_node.base_path
-                            file_format = scene.node_tree.nodes['segmentation_masks'].format.file_format
+                            file_format = seg_masks_node.format.file_format
                             extension = get_img_extension(file_format)
                             if os.path.isdir(seg_masks_path):
                                 for tmp_file in os.listdir(seg_masks_path):
@@ -469,27 +469,30 @@ def load_handler_after_rend_frame(scene): # TODO: not sure if this is the best p
                                         os.remove(img_path)
                     if vision_blender.bool_save_opt_flow:
                         """ Forward optical flow - from current to next frame """
-                        opt_flw_path = os.path.join(gt_dir_path, 'opt_flow')
-                        file_format = scene.node_tree.nodes['opt_flow'].format.file_format
-                        extension = get_img_extension(file_format)
-                        for tmp_file in os.listdir(opt_flw_path):
-                            #bpy.path.extensions_image
-                            if tmp_file.endswith(extension):
-                                img_path = os.path.join(opt_flw_path, tmp_file)
-                                tmp_img = bpy.data.images.load(img_path)
-                                #tmp_img.alpha_mode = 'STRAIGHT'
-                                opt_flw = np.array(tmp_img.pixels[:])
-                                opt_flw.resize((res_y, res_x, 4)) # Numpy works with (y, x, channels)
-                                opt_flw = opt_flw[:,:,:2] # We are only interested in the first two channels
-                                opt_flw = np.flip(opt_flw, 0) # flip vertically (in Blender y in the image points up instead of down)
-                                # In Blender y is up instead of down, so the y optical flow should be -
-                                #opt_flw[:,:,1] = np.negative(opt_flw[:,:,1]) # channel 1 - y optical flow
-                                # However, I want forward flow (from current to next frame) instead of backward (next frame to current)
-                                # so I invert the optical flow both in x and y
-                                opt_flw[:,:,0] = np.negative(opt_flw[:,:,0])
-                                #opt_flw[:,:,1] = np.negative(opt_flw[:,:,1]) # Doing the `-` twice is the same as not doing
+                        if check_if_node_exists(scene.node_tree, 'opt_flow'):
+                            opt_flw_node = scene.node_tree.nodes['opt_flow']
+                            opt_flw_path = opt_flw_node.base_path
+                            file_format = opt_flw_node.format.file_format
+                            extension = get_img_extension(file_format)
+                            if os.path.isdir(opt_flw_path):
+                                for tmp_file in os.listdir(opt_flw_path):
+                                    #bpy.path.extensions_image
+                                    if tmp_file.endswith(extension):
+                                        img_path = os.path.join(opt_flw_path, tmp_file)
+                                        tmp_img = bpy.data.images.load(img_path)
+                                        #tmp_img.alpha_mode = 'STRAIGHT'
+                                        opt_flw = np.array(tmp_img.pixels[:])
+                                        opt_flw.resize((res_y, res_x, 4)) # Numpy works with (y, x, channels)
+                                        opt_flw = opt_flw[:,:,:2] # We are only interested in the first two channels
+                                        opt_flw = np.flip(opt_flw, 0) # flip vertically (in Blender y in the image points up instead of down)
+                                        # In Blender y is up instead of down, so the y optical flow should be -
+                                        #opt_flw[:,:,1] = np.negative(opt_flw[:,:,1]) # channel 1 - y optical flow
+                                        # However, I want forward flow (from current to next frame) instead of backward (next frame to current)
+                                        # so I invert the optical flow both in x and y
+                                        opt_flw[:,:,0] = np.negative(opt_flw[:,:,0])
+                                        #opt_flw[:,:,1] = np.negative(opt_flw[:,:,1]) # Doing the `-` twice is the same as not doing
 
-                                os.remove(img_path)
+                                        os.remove(img_path)
         """ Objects' pose """
         object_pose_labels = None
         object_pose_mats = None
