@@ -151,13 +151,20 @@ def correct_cycles_depth(z_map, res_x, res_y, f_x, f_y, c_x, c_y, INVALID_POINT)
     return z_map
 
 
-def get_or_create_node(tree, node_type, node_name):
+def check_if_node_exists(tree, node_name):
     node_ind = tree.nodes.find(node_name)
     if node_ind == -1:
+        return False
+    return True
+
+
+def get_or_create_node(tree, node_type, node_name):
+    node_exists = check_if_node_exists(tree, node_name)
+    if not node_exists:
         v = tree.nodes.new(node_type)
         v.name = node_name
     else:
-        v = tree.nodes[node_ind]
+        v = tree.nodes[node_name]
     return v
 
 
@@ -271,29 +278,32 @@ def load_handler_render_init(scene):
                 """ segmentation masks """
                 clean_folder(segmentation_masks_path)
                 if vision_blender.bool_save_segmentation_masks:
-                    ## create output node
-                    node_segmentation_masks = get_or_create_node(tree, "CompositorNodeOutputFile", "segmentation_masks")
-                    ### set-up the output img format
-                    node_segmentation_masks.format.file_format = 'TARGA'
-                    ### set-up the output path
-                    node_segmentation_masks.base_path = segmentation_masks_path
-                    ## For the segmentation masks we need to set-up an output image for each pass index
-                    ### ref: https://blender.stackexchange.com/questions/18243/how-to-use-index-passes-in-other-compositing-packages
-                    node_segmentation_masks.layer_slots.clear()
-                    for obj in bpy.data.objects:
-                        obj_pass_ind = obj.pass_index
-                        if obj_pass_ind != 0:
-                            ind_str = '{}_'.format(obj_pass_ind)
-                            # TODO: check if that input socket already exists, otherwise create it
-                            socket = node_segmentation_masks.inputs.get(ind_str, None)
-                            if socket is None:
-                                # ref: https://blender.stackexchange.com/questions/65013/not-able-to-add-node-sockets-to-an-existing-node-using-python-scripting
-                                node_segmentation_masks.layer_slots.new(ind_str)
-                                node_id_mask = get_or_create_node(tree, "CompositorNodeIDMask", "{}_mask".format(ind_str))
-                                node_id_mask.index = obj_pass_ind
-                                # create link
-                                links.new(node_id_mask.outputs["Alpha"], node_segmentation_masks.inputs[ind_str])
-                                links.new(rl.outputs["IndexOB"], node_id_mask.inputs["ID value"])
+                    obj_ind_found = look_for_obj_index() # Check if there are any object with object index set
+                    if obj_ind_found:
+                        ## create output node
+                        node_segmentation_masks = get_or_create_node(tree, "CompositorNodeOutputFile", "segmentation_masks")
+                        ### set-up the output img format
+                        node_segmentation_masks.format.file_format = 'TARGA'
+                        ### set-up the output path
+                        node_segmentation_masks.base_path = segmentation_masks_path
+                        ## For the segmentation masks we need to set-up an output image for each pass index
+                        ### ref: https://blender.stackexchange.com/questions/18243/how-to-use-index-passes-in-other-compositing-packages
+                        node_segmentation_masks.layer_slots.clear()
+
+                        for obj in bpy.data.objects:
+                            obj_pass_ind = obj.pass_index
+                            if obj_pass_ind != 0:
+                                ind_str = '{}_'.format(obj_pass_ind)
+                                # TODO: check if that input socket already exists, otherwise create it
+                                socket = node_segmentation_masks.inputs.get(ind_str, None)
+                                if socket is None:
+                                    # ref: https://blender.stackexchange.com/questions/65013/not-able-to-add-node-sockets-to-an-existing-node-using-python-scripting
+                                    node_segmentation_masks.layer_slots.new(ind_str)
+                                    node_id_mask = get_or_create_node(tree, "CompositorNodeIDMask", "{}_mask".format(ind_str))
+                                    node_id_mask.index = obj_pass_ind
+                                    # create link
+                                    links.new(node_id_mask.outputs["Alpha"], node_segmentation_masks.inputs[ind_str])
+                                    links.new(rl.outputs["IndexOB"], node_id_mask.inputs["ID value"])
                 else:
                     # if `bool_save_segmentation_masks = False`, then remove node_segmentation_masks
                     node_ind = tree.nodes.find("segmentation_masks")
@@ -436,23 +446,27 @@ def load_handler_after_rend_frame(scene): # TODO: not sure if this is the best p
                     # in `load_handler_render_init` and at each rendering frame we clean these folders, so all the images are output data
                     # TODO: this part of the code is really slow, essentially I am opening the images one by one, so many segmentation masks would make it even slower
                     if vision_blender.bool_save_segmentation_masks:
-                        seg_masks_path = os.path.join(gt_dir_path, 'segmentation_masks')
-                        file_format = scene.node_tree.nodes['segmentation_masks'].format.file_format
-                        extension = get_img_extension(file_format)
-                        for tmp_file in os.listdir(seg_masks_path):
-                            if tmp_file.endswith(extension):
-                                if seg_masks is None:
-                                    seg_masks = np.zeros((res_y, res_x), dtype=np.uint16)
-                                img_path = os.path.join(seg_masks_path, tmp_file)
-                                obj_pass_ind = tmp_file.split('_', 1)[0] # add nsplits = 1 for efficiency 
-                                #print(obj_pass_ind)
-                                tmp_img = bpy.data.images.load(img_path)
-                                tmp_seg_mask = np.array(tmp_img.pixels[:])
-                                tmp_seg_mask.resize((res_y, res_x, 4)) # Numpy works with (y, x, channels)
-                                tmp_seg_mask = tmp_seg_mask[:,:,0]
-                                tmp_seg_mask = np.flip(tmp_seg_mask, 0) # flip vertically (in Blender y in the image points up instead of down)
-                                seg_masks[tmp_seg_mask != 0] = obj_pass_ind
-                                os.remove(img_path)
+                        # check if node exists
+                        if check_if_node_exists(scene.node_tree, 'segmentation_masks'):
+                            seg_masks_node = scene.node_tree.nodes['segmentation_masks']
+                            seg_masks_path = seg_masks_node.base_path
+                            file_format = scene.node_tree.nodes['segmentation_masks'].format.file_format
+                            extension = get_img_extension(file_format)
+                            if os.path.isdir(seg_masks_path):
+                                for tmp_file in os.listdir(seg_masks_path):
+                                    if tmp_file.endswith(extension):
+                                        if seg_masks is None:
+                                            seg_masks = np.zeros((res_y, res_x), dtype=np.uint16)
+                                        img_path = os.path.join(seg_masks_path, tmp_file)
+                                        obj_pass_ind = tmp_file.split('_', 1)[0] # add nsplits = 1 for efficiency 
+                                        #print(obj_pass_ind)
+                                        tmp_img = bpy.data.images.load(img_path)
+                                        tmp_seg_mask = np.array(tmp_img.pixels[:])
+                                        tmp_seg_mask.resize((res_y, res_x, 4)) # Numpy works with (y, x, channels)
+                                        tmp_seg_mask = tmp_seg_mask[:,:,0]
+                                        tmp_seg_mask = np.flip(tmp_seg_mask, 0) # flip vertically (in Blender y in the image points up instead of down)
+                                        seg_masks[tmp_seg_mask != 0] = obj_pass_ind
+                                        os.remove(img_path)
                     if vision_blender.bool_save_opt_flow:
                         """ Forward optical flow - from current to next frame """
                         opt_flw_path = os.path.join(gt_dir_path, 'opt_flow')
