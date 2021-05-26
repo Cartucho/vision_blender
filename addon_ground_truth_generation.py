@@ -125,7 +125,7 @@ def get_camera_parameters_extrinsic(scene):
     return extr
 
 
-def get_objects_pose(scene):
+def get_objects_pose():
     poses_labels = []
     poses = None
     for obj in bpy.data.objects:
@@ -508,7 +508,7 @@ def load_handler_after_rend_frame(scene): # TODO: not sure if this is the best p
         object_pose_labels = None
         object_pose_mats = None
         if vision_blender.bool_save_obj_poses:
-            object_pose_labels, object_pose_mats = get_objects_pose(scene)
+            object_pose_labels, object_pose_mats = get_objects_pose()
         """ Save data """
         intrinsic_mat = None
         if not vision_blender.bool_save_cam_param:
