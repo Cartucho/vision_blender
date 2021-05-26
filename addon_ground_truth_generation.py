@@ -125,19 +125,13 @@ def get_camera_parameters_extrinsic(scene):
     return extr
 
 
-def get_objects_pose():
-    poses_labels = []
-    poses = None
-    for obj in bpy.data.objects:
-        poses_labels.append(obj.name)
-        mw = np.asarray(obj.matrix_world)
-        if poses is None:
-            poses = mw[None]
-        else:
-            poses = np.vstack((poses, mw[None]))
-    # conver list to array (so that we can save in the npz file)
-    poses_labels = np.array(poses_labels)
-    return poses_labels, poses
+def get_obj_poses():
+    n_chars = get_largest_object_name_length()
+    n_object = len(bpy.data.objects)
+    obj_poses = np.zeros(n_object, dtype=[('name', 'U{}'.format(n_chars)), ('pose', np.float64, (4, 4))])
+    for ind, obj in enumerate(bpy.data.objects):
+        obj_poses[ind] = (obj.name, obj.matrix_world)
+    return obj_poses
 
 
 def correct_cycles_depth(z_map, res_x, res_y, f_x, f_y, c_x, c_y, INVALID_POINT):
@@ -505,10 +499,9 @@ def load_handler_after_rend_frame(scene): # TODO: not sure if this is the best p
         if seg_masks is not None:
             seg_masks_indexes = get_struct_array_of_obj_indexes()
         """ Objects' pose """
-        object_pose_labels = None
-        object_pose_mats = None
+        obj_poses = None
         if vision_blender.bool_save_obj_poses:
-            object_pose_labels, object_pose_mats = get_objects_pose()
+            obj_poses = get_obj_poses()
         """ Save data """
         intrinsic_mat = None
         if not vision_blender.bool_save_cam_param:
@@ -528,8 +521,7 @@ def load_handler_after_rend_frame(scene): # TODO: not sure if this is the best p
                     'normal_map'                 : normal,
                     'depth_map'                  : z,
                     'disparity_map'              : disp,
-                    'object_pose_labels'         : object_pose_labels,
-                    'object_pose_mats'           : object_pose_mats
+                    'object_poses'               : obj_poses
                    }
         out_dict_filtered = {k: v for k, v in out_dict.items() if v is not None}
         np.savez_compressed(out_path, **out_dict_filtered)
