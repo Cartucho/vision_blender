@@ -22,25 +22,25 @@ if 'extrinsic_mat' in data.files:
     extrinsic_mat = data['extrinsic_mat']
     print("\tCamera extrinsic mat:\n{}\n".format(extrinsic_mat))
 
-if 'object_pose_labels' in data.files and 'object_pose_mats' in data.files:
-    obj_pose_labels = data['object_pose_labels']
-    obj_pose_mats = data['object_pose_mats']
-    obj_poses = [{'obj_name': i, 'obj_pose_mat': j[:3,:]} for i, j in zip(obj_pose_labels, obj_pose_mats)]
+if 'object_poses' in data.files:
+    obj_poses = data['object_poses']
     print('\tObject poses:')
     for obj in obj_poses:
-        print(obj['obj_name'])
-        print(obj['obj_pose_mat'])
-        if obj['obj_name'] != 'Light':
-            """ Get 2d coordinate of object """
+        obj_name = obj['name']
+        obj_mat  = obj['pose']
+        print(obj_name)
+        print(obj_mat)
+        # Get 2d pixel coordinate of object
+        if obj_name != 'Light' and obj_name != 'Camera':
             if ('intrinsic_mat' in data.files) and ('extrinsic_mat' in data.files):
-                point_3d = obj['obj_pose_mat'][:,3]
-                point_3d_homog = np.append(point_3d, [1.0])
-                point_3d_cam = np.matmul(extrinsic_mat, point_3d_homog)
+                point_3d = obj_mat[:,3]
+                point_3d_cam = np.matmul(extrinsic_mat, point_3d)
                 point_2d_scaled = np.matmul(intrinsic_mat, point_3d_cam)
                 if point_2d_scaled[2] != 0:
                     point_2d = point_2d_scaled / point_2d_scaled[2]
                     u, v = point_2d[:2]
                     print(' 2D image projection u:{} v:{}'.format(u, v))
+
 try:
     import cv2 as cv
 
