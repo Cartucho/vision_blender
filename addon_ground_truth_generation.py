@@ -501,6 +501,9 @@ def load_handler_after_rend_frame(scene): # TODO: not sure if this is the best p
 
                                         os.remove(img_path)
                                 os.rmdir(opt_flw_path)
+        seg_masks_indexes = None
+        if seg_masks is not None:
+            seg_masks_indexes = get_struct_array_of_obj_indexes()
         """ Objects' pose """
         object_pose_labels = None
         object_pose_mats = None
@@ -517,15 +520,16 @@ def load_handler_after_rend_frame(scene): # TODO: not sure if this is the best p
         # Blender by default assumes a padding of 4 digits
         out_path = os.path.join(gt_dir_path, '{:04d}.npz'.format(scene.frame_current))
         #print(out_path)
-        out_dict = {'optical_flow'       : opt_flw,
-                    'segmentation_masks' : seg_masks,
-                    'intrinsic_mat'      : intrinsic_mat,
-                    'extrinsic_mat'      : extrinsic_mat,
-                    'normal_map'         : normal,
-                    'depth_map'          : z,
-                    'disparity_map'      : disp,
-                    'object_pose_labels' : object_pose_labels,
-                    'object_pose_mats'   : object_pose_mats
+        out_dict = {'optical_flow'               : opt_flw,
+                    'segmentation_masks'         : seg_masks,
+                    'segmentation_masks_indexes' : seg_masks_indexes,
+                    'intrinsic_mat'              : intrinsic_mat,
+                    'extrinsic_mat'              : extrinsic_mat,
+                    'normal_map'                 : normal,
+                    'depth_map'                  : z,
+                    'disparity_map'              : disp,
+                    'object_pose_labels'         : object_pose_labels,
+                    'object_pose_mats'           : object_pose_mats
                    }
         out_dict_filtered = {k: v for k, v in out_dict.items() if v is not None}
         np.savez_compressed(out_path, **out_dict_filtered)
