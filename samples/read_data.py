@@ -77,10 +77,30 @@ try:
         cv.imshow("Surface normals", normals)
 
     if 'segmentation_masks' in data.files:
+        # we only have segmentation masks if at least 1 object's pass_index != 0
         sg_msk = data['segmentation_masks']
+        sg_msk_inds = data['segmentation_masks_indexes']
+        #print(sg_msk_inds)
+        # You can also access the individual fields using:
+        #print(sg_msk_inds['name'])
+        #print(sg_msk_inds['pass_index'])
+
+        # Get a unique color for each of the indexes
+        inds = sg_msk_inds['pass_index']
+        inds = inds[inds != 0] # remove zeros
+        inds = np.unique(inds) # remove repeated (returns the sorted unique)
+        # Distribute the `inds` to values between 0 and 255
+        n_inds = len(inds)
+        cmap_vals =  np.linspace(0., 1., n_inds)
+        cmap_vals = cmap_vals * 255.
+
         height, width = sg_msk.shape
         sg_msk_img = np.zeros((height, width, 3), np.uint8)
-        sg_msk_img[sg_msk == 1] = [255, 0, 0] # Draw in blue where `obj_ind = 1`
+        for counter, ind in enumerate(inds):
+            sg_msk_img[sg_msk == ind] = cmap_vals[counter]
+
+        sg_msk_img = cv.applyColorMap(sg_msk_img, cv.COLORMAP_RAINBOW)
+        sg_msk_img[sg_msk == 0] = [0, 0, 0]
         cv.imshow("Segmentation masks", sg_msk_img)
 
     if 'depth_map' in data.files:
