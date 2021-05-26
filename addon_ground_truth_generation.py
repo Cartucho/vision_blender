@@ -196,6 +196,25 @@ def check_any_obj_with_index():
     return False
 
 
+def get_largest_object_name_length():
+    max_chars = 0
+    for obj in bpy.data.objects:
+        if len(obj.name) > max_chars:
+            max_chars = len(obj.name)
+    return max_chars
+
+
+def get_struct_array_of_obj_indexes():
+    # ref: https://numpy.org/doc/stable/user/basics.rec.html
+    n_chars = get_largest_object_name_length()
+    n_object = len(bpy.data.objects)
+    # max_index = 32767 in Blender version 2.83, so unsigned 2-byte is more than enough memory
+    obj_indexes = np.zeros(n_object, dtype=[('name', 'U{}'.format(n_chars)), ('pass_index', '<u2')])
+    for ind, obj in enumerate(bpy.data.objects):
+        obj_indexes[ind] = (obj.name, obj.pass_index)
+    return obj_indexes
+
+
 def get_img_extension(file_format):
     if file_format == 'PNG':
         return '.png'
