@@ -189,7 +189,7 @@ def clean_folder(folder_path):
                     print('Failed to delete %s. Reason: %s' % (file_path, e))
 
 
-def look_for_obj_index():
+def check_any_obj_with_index():
     for obj in bpy.data.objects:
         if obj.pass_index != 0:
             return True
@@ -281,7 +281,7 @@ def load_handler_render_init(scene):
                 """ segmentation masks """
                 clean_folder(segmentation_masks_path)
                 if vision_blender.bool_save_segmentation_masks:
-                    obj_ind_found = look_for_obj_index() # Check if there are any object with object index set
+                    obj_ind_found = check_any_obj_with_index() # Check if there are any object with object index set
                     if obj_ind_found:
                         ## create output node
                         node_segmentation_masks = create_node(tree, "CompositorNodeOutputFile", "segmentation_masks_vision_blender")
@@ -609,7 +609,7 @@ class RENDER_PT_gt_generator(GroundTruthGeneratorPanel):
             col.label(text="Optical Flow and Segmentation Masks requires Cycles!", icon='ERROR')
 
         if vision_blender.bool_save_segmentation_masks and context.engine == 'CYCLES':
-            obj_ind_found = look_for_obj_index()
+            obj_ind_found = check_any_obj_with_index()
             if not obj_ind_found:
                 col = layout.column(align=True)
                 col.label(text="No object index found yet for Segmentation Masks...", icon='ERROR')
