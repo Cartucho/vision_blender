@@ -1,3 +1,4 @@
 vision_blender_ros/data/
 *.swp
 dev/
+test/
