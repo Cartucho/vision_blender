@@ -508,8 +508,8 @@ def load_handler_after_rend_frame(scene): # TODO: not sure if this is the best p
             extrinsic_mat = None
         else:
             intrinsic_mat = np.array([[f_x,   0,  c_x],
-                             [  0, f_y,  c_y],
-                             [  0,   0,    1]])
+                                      [  0, f_y,  c_y],
+                                      [  0,   0,    1]])
         # Blender by default assumes a padding of 4 digits
         out_path = os.path.join(gt_dir_path, '{:04d}.npz'.format(scene.frame_current))
         #print(out_path)
