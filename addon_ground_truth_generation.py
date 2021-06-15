@@ -216,10 +216,19 @@ def get_struct_array_of_obj_indexes():
 
 def is_stereo_ok_for_disparity(scene):
     if (scene.render.use_multiview and
-        scene.camera.data.stereo.convergence_mode == 'PARALLEL' and
-        scene.camera.data.stereo.pivot == 'LEFT'): # TODO: handle the case where the pivot is the right camera
+        scene.camera.data.stereo.convergence_mode == 'PARALLEL'):
         return True
     return False
+
+
+def get_transf0to1(scene):
+    transf = None
+    if scene.camera.data.stereo.convergence_mode == 'PARALLEL':
+        translation_x = scene.camera.data.stereo.interocular_distance
+        transf = np.zeros((4, 4))
+        np.fill_diagonal(transf, 1)
+        transf[0, 3] = - translation_x
+    return transf
 
 
 def load_file_data_to_numpy(scene, tmp_file_path, data_map):
@@ -276,7 +285,7 @@ def save_data_to_npz(scene, is_stereo_activated,
                       seg_masks0, seg_masks1,
                       seg_masks_indexes,
                       intrinsic_mat,
-                      extrinsic_mat,
+                      extrinsic_mat0, extrinsic_mat1,
                       obj_poses):
     # ref: https://stackoverflow.com/questions/35133317/numpy-save-some-arrays-at-once
     gt_dir_path = os.path.dirname(scene.render.filepath)
@@ -285,7 +294,7 @@ def save_data_to_npz(scene, is_stereo_activated,
                 'segmentation_masks'         : seg_masks0,
                 'segmentation_masks_indexes' : seg_masks_indexes,
                 'intrinsic_mat'              : intrinsic_mat,
-                'extrinsic_mat'              : extrinsic_mat,
+                'extrinsic_mat'              : extrinsic_mat0,
                 'normal_map'                 : normal0,
                 'depth_map'                  : z0,
                 'disparity_map'              : disp0,
@@ -298,7 +307,7 @@ def save_data_to_npz(scene, is_stereo_activated,
                     'segmentation_masks'         : seg_masks1,
                     'segmentation_masks_indexes' : seg_masks_indexes,
                     'intrinsic_mat'              : intrinsic_mat,
-                    'extrinsic_mat'              : extrinsic_mat,
+                    'extrinsic_mat'              : extrinsic_mat1,
                     'normal_map'                 : normal1,
                     'depth_map'                  : z1,
                     'disparity_map'              : disp1,
@@ -450,11 +459,19 @@ def load_handler_after_rend_frame(scene): # TODO: not sure if this is the best p
         #print(scene.frame_current)
         scene.frame_set(scene.frame_current) # needed to update the camera position
         intrinsic_mat = None
-        extrinsic_mat = None
+        extrinsic_mat0 = None
+        extrinsic_mat1 = None
         if vision_blender.bool_save_cam_param:
-            ### extrinsic
-            extrinsic_mat = get_camera_parameters_extrinsic(scene) # needed for objects' pose
-            ### intrinsic
+            extrinsic_mat0 = get_camera_parameters_extrinsic(scene)
+            if is_stereo_activated:
+                transf0to1 = get_transf0to1(scene)
+                if transf0to1 is not None:
+                    extrinsic_mat0 = np.vstack((extrinsic_mat0, [0, 0, 0, 1.]))
+                    extrinsic_mat1 = np.matmul(transf0to1, extrinsic_mat0)
+                    # Remove homogeneous row
+                    extrinsic_mat0 = extrinsic_mat0[:3,:]
+                    extrinsic_mat1 = extrinsic_mat1[:3,:]
+            # Intrinsic mat is the same for both stereo cameras
             f_x, f_y, c_x, c_y = get_camera_parameters_intrinsic(scene)
             intrinsic_mat = np.array([[f_x,   0,  c_x],
                                       [  0, f_y,  c_y],
@@ -527,7 +544,7 @@ def load_handler_after_rend_frame(scene): # TODO: not sure if this is the best p
                          seg_masks0, seg_masks1,
                          seg_masks_indexes, # Same indexes for both cameras
                          intrinsic_mat, # Both cameras have the same intrinsic parameters
-                         extrinsic_mat, # TODO: there should be individual extrinsic mats
+                         extrinsic_mat0, extrinsic_mat1,
                          obj_poses) # Object poses are relative to the world coordinate frame, so they are the same
 
 
