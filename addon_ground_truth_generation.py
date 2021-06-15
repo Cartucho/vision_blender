@@ -378,18 +378,8 @@ def load_handler_render_init(scene):
                 # We can only generate segmentation masks if that are any labeled objects (objects w/ index set)
                 non_zero_obj_ind_found = check_any_obj_with_non_zero_index()
                 if non_zero_obj_ind_found:
-                    ## For the segmentation masks we need to set-up an output image for each pass index
-                    ### ref: https://blender.stackexchange.com/questions/18243/how-to-use-index-passes-in-other-compositing-packages
-                    for obj_pass_ind in get_set_of_non_zero_obj_ind():
-                        # Create new slot in output node
-                        ind_str = '####_Segmentation_Mask_{}'.format(obj_pass_ind)
-                        slot_seg_mask = node_output.layer_slots.new(ind_str)
-                        # Create node that will filter that id
-                        node_id_mask = create_node(tree, "CompositorNodeIDMask", "{}_mask_vision_blender".format(obj_pass_ind))
-                        node_id_mask.index = obj_pass_ind
-                        # Create link
-                        links.new(node_id_mask.outputs["Alpha"], slot_seg_mask)
-                        links.new(rl.outputs["IndexOB"], node_id_mask.inputs["ID value"])
+                    slot_seg_mask = node_output.layer_slots.new('####_Segmentation_Mask')
+                    links.new(rl.outputs["IndexOB"], slot_seg_mask)
             """ Optical flow - Current to next frame """
             if vision_blender.bool_save_opt_flow:
                 # Create new slot in output node
@@ -507,24 +497,15 @@ def load_handler_after_rend_frame(scene): # TODO: not sure if this is the best p
                 seg_masks1 = None
                 seg_masks_indexes = None
                 if vision_blender.bool_save_segmentation_masks and check_any_obj_with_non_zero_index():
-                    for obj_pass_ind in get_set_of_non_zero_obj_ind():
-                        if is_stereo_activated:
-                            tmp_file_path1 = os.path.join(TMP_FILES_PATH, '{:04d}_Segmentation_Mask_{}{}.exr'.format(scene.frame_current, obj_pass_ind, suffix1))
-                            tmp_seg_mask1 = load_file_data_to_numpy(scene, tmp_file_path1, 'Segmentation')
-                            if seg_masks1 is None:
-                                seg_masks1 = tmp_seg_mask1
-                            else:
-                                seg_masks1[tmp_seg_mask1 != 0] = obj_pass_ind # Accumulate
-                            tmp_file_path0 = os.path.join(TMP_FILES_PATH, '{:04d}_Segmentation_Mask_{}{}.exr'.format(scene.frame_current, obj_pass_ind, suffix0))
-                        else:
-                            tmp_file_path0 = os.path.join(TMP_FILES_PATH, '{:04d}_Segmentation_Mask_{}.exr'.format(scene.frame_current, obj_pass_ind))
-                        tmp_seg_mask0 = load_file_data_to_numpy(scene, tmp_file_path0, 'Segmentation')
-                        if seg_masks0 is None:
-                            seg_masks0 = tmp_seg_mask0
-                        else:
-                            seg_masks0[tmp_seg_mask0 != 0] = obj_pass_ind # Accumulate
-                    if seg_masks0 is not None:
-                        seg_masks_indexes = get_struct_array_of_obj_indexes()
+                    seg_masks_indexes = get_struct_array_of_obj_indexes()
+                    if is_stereo_activated:
+                        tmp_file_path1 = os.path.join(TMP_FILES_PATH, '{:04d}_Segmentation_Mask{}.exr'.format(scene.frame_current, suffix1))
+                        seg_masks1 = load_file_data_to_numpy(scene, tmp_file_path1, 'Segmentation')
+                        tmp_file_path0 = os.path.join(TMP_FILES_PATH, '{:04d}_Segmentation_Mask{}.exr'.format(scene.frame_current, suffix0))
+                    else:
+                        tmp_file_path0 = os.path.join(TMP_FILES_PATH, '{:04d}_Segmentation_Mask.exr'.format(scene.frame_current))
+                    seg_masks0 = load_file_data_to_numpy(scene, tmp_file_path0, 'Segmentation')
+
                 """ Optical flow - Forward -> from current to next frame"""
                 opt_flw0 = None
                 opt_flw1 = None
@@ -537,7 +518,7 @@ def load_handler_after_rend_frame(scene): # TODO: not sure if this is the best p
                         tmp_file_path0 = os.path.join(TMP_FILES_PATH, '{:04d}_Optical_Flow.exr'.format(scene.frame_current))
                     opt_flw0 = load_file_data_to_numpy(scene, tmp_file_path0, 'OptFlow')
             # Optional step - delete the tmp output files
-            #clean_folder(TMP_FILES_PATH)
+            clean_folder(TMP_FILES_PATH)
         """ Save data """
         save_data_to_npz(scene, is_stereo_activated,
                          normal0, normal1,
