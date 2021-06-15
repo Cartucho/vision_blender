@@ -244,9 +244,9 @@ def load_file_data_to_numpy(scene, tmp_file_path, data_map):
             z = correct_cycles_depth(z, res_x, res_y, f_x, f_y, c_x, c_y, INVALID_POINT)
         """ disparity """
         # If stereo also calculate disparity
-        if not is_stereo_ok_for_disparity(scene):
-            return z
         disp = None
+        if not is_stereo_ok_for_disparity(scene):
+            return z, disp
         baseline_m = scene.camera.data.stereo.interocular_distance # [m]
         disp = np.zeros_like(z) # disp = 0.0, on the invalid points
         disp[z != INVALID_POINT] = (baseline_m * f_x) / z[z != INVALID_POINT]
@@ -267,6 +267,53 @@ def load_file_data_to_numpy(scene, tmp_file_path, data_map):
         opt_flw[:,:,0] = np.negative(opt_flw[:,:,0])
         #opt_flw[:,:,1] = np.negative(opt_flw[:,:,1]) # Doing the `-` twice is the same as not doing
         return opt_flw
+
+
+def save_data_to_npz(scene, is_stereo_activated,
+                      normal0, normal1,
+                      z0, z1, disp0, disp1,
+                      opt_flw0, opt_flw1,
+                      seg_masks0, seg_masks1,
+                      seg_masks_indexes,
+                      intrinsic_mat,
+                      extrinsic_mat,
+                      obj_poses):
+    # ref: https://stackoverflow.com/questions/35133317/numpy-save-some-arrays-at-once
+    gt_dir_path = os.path.dirname(scene.render.filepath)
+    #print(gt_dir_path)
+    out_dict0 = {'optical_flow'              : opt_flw0,
+                'segmentation_masks'         : seg_masks0,
+                'segmentation_masks_indexes' : seg_masks_indexes,
+                'intrinsic_mat'              : intrinsic_mat,
+                'extrinsic_mat'              : extrinsic_mat,
+                'normal_map'                 : normal0,
+                'depth_map'                  : z0,
+                'disparity_map'              : disp0,
+                'object_poses'               : obj_poses
+               }
+    if is_stereo_activated:
+        # Camera 1
+        suffix1 = scene.render.views[1].file_suffix # By default '_R'
+        out_dict1 = {'optical_flow'              : opt_flw1,
+                    'segmentation_masks'         : seg_masks1,
+                    'segmentation_masks_indexes' : seg_masks_indexes,
+                    'intrinsic_mat'              : intrinsic_mat,
+                    'extrinsic_mat'              : extrinsic_mat,
+                    'normal_map'                 : normal1,
+                    'depth_map'                  : z1,
+                    'disparity_map'              : disp1,
+                    'object_poses'               : obj_poses
+                   }
+        out_path1 = os.path.join(gt_dir_path, '{:04d}{}.npz'.format(scene.frame_current, suffix1))
+        out_dict_filtered1 = {k: v for k, v in out_dict1.items() if v is not None}
+        np.savez_compressed(out_path1, **out_dict_filtered1)
+        # Camera 0
+        suffix0 = scene.render.views[0].file_suffix # By default '_L'
+        out_path0 = os.path.join(gt_dir_path, '{:04d}{}.npz'.format(scene.frame_current, suffix0))
+    else:
+        out_path0 = os.path.join(gt_dir_path, '{:04d}.npz'.format(scene.frame_current))
+    out_dict_filtered0 = {k: v for k, v in out_dict0.items() if v is not None}
+    np.savez_compressed(out_path0, **out_dict_filtered0)
 
 
 @persistent
@@ -431,89 +478,77 @@ def load_handler_after_rend_frame(scene): # TODO: not sure if this is the best p
             node_output = scene.node_tree.nodes['output_vision_blender']
             TMP_FILES_PATH = node_output.base_path
             """ Normal map """
-            normal = None
+            normal0 = None
+            normal1 = None
             if vision_blender.bool_save_normals:
                 if is_stereo_activated:
+                    tmp_file_path1 = os.path.join(TMP_FILES_PATH, '{:04d}_Normal{}.exr'.format(scene.frame_current, suffix1))
+                    normal1 = load_file_data_to_numpy(scene, tmp_file_path1, 'Normal')
                     tmp_file_path0 = os.path.join(TMP_FILES_PATH, '{:04d}_Normal{}.exr'.format(scene.frame_current, suffix0))
-                    normal = load_file_data_to_numpy(scene, tmp_file_path0, 'Normal')
-                    #tmp_file_path1 = os.path.join(TMP_FILES_PATH, '{:04d}_Normal{}.exr'.format(scene.frame_current, suffix1))
-                    #normal1 = load_file_data_to_numpy(scene, tmp_file_path1, 'Normal')
                 else:
-                    tmp_file_path = os.path.join(TMP_FILES_PATH, '{:04d}_Normal.exr'.format(scene.frame_current))
-                    normal = load_file_data_to_numpy(scene, tmp_file_path, 'Normal')
+                    tmp_file_path0 = os.path.join(TMP_FILES_PATH, '{:04d}_Normal.exr'.format(scene.frame_current))
+                normal0 = load_file_data_to_numpy(scene, tmp_file_path0, 'Normal')
             """ Depth + Disparity """
-            z = None
-            disp = None
+            z0 = None
+            z1 = None
+            disp0 = None
+            disp1 = None
             if vision_blender.bool_save_depth:
                 if is_stereo_activated:
+                    tmp_file_path1 = os.path.join(TMP_FILES_PATH, '{:04d}_Depth{}.exr'.format(scene.frame_current, suffix1))
+                    z1, disp1 = load_file_data_to_numpy(scene, tmp_file_path1, 'Depth')
                     tmp_file_path0 = os.path.join(TMP_FILES_PATH, '{:04d}_Depth{}.exr'.format(scene.frame_current, suffix0))
-                    z, disp = load_file_data_to_numpy(scene, tmp_file_path0, 'Depth')
-                    #tmp_file_path1 = os.path.join(TMP_FILES_PATH, '{:04d}_Depth{}.exr'.format(scene.frame_current, suffix1))
-                    #z1, disp1 = load_file_data_to_numpy(scene, tmp_file_path1, 'Depth')
                 else:
-                    tmp_file_path = os.path.join(TMP_FILES_PATH, '{:04d}_Depth.exr'.format(scene.frame_current))
-                    z = load_file_data_to_numpy(scene, tmp_file_path, 'Depth')
+                    tmp_file_path0 = os.path.join(TMP_FILES_PATH, '{:04d}_Depth.exr'.format(scene.frame_current))
+                z0, disp0 = load_file_data_to_numpy(scene, tmp_file_path0, 'Depth')
             if scene.render.engine == "CYCLES":
                 """ Segmentation masks """
-                seg_masks = None
+                seg_masks0 = None
+                seg_masks1 = None
                 seg_masks_indexes = None
                 if vision_blender.bool_save_segmentation_masks and check_any_obj_with_non_zero_index():
                     for obj_pass_ind in get_set_of_non_zero_obj_ind():
                         if is_stereo_activated:
+                            tmp_file_path1 = os.path.join(TMP_FILES_PATH, '{:04d}_Segmentation_Mask_{}{}.exr'.format(scene.frame_current, obj_pass_ind, suffix1))
+                            tmp_seg_mask1 = load_file_data_to_numpy(scene, tmp_file_path1, 'Segmentation')
+                            if seg_masks1 is None:
+                                seg_masks1 = tmp_seg_mask1
+                            else:
+                                seg_masks1[tmp_seg_mask1 != 0] = obj_pass_ind # Accumulate
                             tmp_file_path0 = os.path.join(TMP_FILES_PATH, '{:04d}_Segmentation_Mask_{}{}.exr'.format(scene.frame_current, obj_pass_ind, suffix0))
-                            tmp_seg_mask = load_file_data_to_numpy(scene, tmp_file_path0, 'Segmentation')
-                            if seg_masks is None:
-                                seg_masks = tmp_seg_mask
-                            else:
-                                seg_masks[tmp_seg_mask != 0] = obj_pass_ind # Accumulate
-                            #tmp_file_path1 = os.path.join(TMP_FILES_PATH, '{:04d}_Segmentation_Mask_{}{}.exr'.format(scene.frame_current, obj_pass_ind, suffix1))
-                            #tmp_seg_mask1 = load_file_data_to_numpy(scene, tmp_file_path1, 'Segmentation')
-                            #if seg_masks1 is None:
-                            #    seg_masks1 = tmp_seg_mask1
-                            #else:
-                            #    seg_masks1[tmp_seg_mask1 != 0] = obj_pass_ind # Accumulate
                         else:
-                            tmp_file_path = os.path.join(TMP_FILES_PATH, '{:04d}_Segmentation_Mask_{}.exr'.format(scene.frame_current, obj_pass_ind))
-                            tmp_seg_mask = load_file_data_to_numpy(scene, tmp_file_path, 'Segmentation')
-                            if seg_masks is None:
-                                seg_masks = tmp_seg_mask
-                            else:
-                                seg_masks[tmp_seg_mask != 0] = obj_pass_ind # Accumulate
-                    if seg_masks is not None:
+                            tmp_file_path0 = os.path.join(TMP_FILES_PATH, '{:04d}_Segmentation_Mask_{}.exr'.format(scene.frame_current, obj_pass_ind))
+                        tmp_seg_mask0 = load_file_data_to_numpy(scene, tmp_file_path0, 'Segmentation')
+                        if seg_masks0 is None:
+                            seg_masks0 = tmp_seg_mask0
+                        else:
+                            seg_masks0[tmp_seg_mask0 != 0] = obj_pass_ind # Accumulate
+                    if seg_masks0 is not None:
                         seg_masks_indexes = get_struct_array_of_obj_indexes()
                 """ Optical flow - Forward -> from current to next frame"""
-                opt_flw = None
+                opt_flw0 = None
+                opt_flw1 = None
                 if vision_blender.bool_save_opt_flow:
                     if is_stereo_activated:
-                        tmp_file_path0 = os.path.join(TMP_FILES_PATH, '{:04d}_Optical_Flow{}.exr'.format(scene.frame_current, suffix0))
-                        opt_flw = load_file_data_to_numpy(scene, tmp_file_path0, 'OptFlow')
                         tmp_file_path1 = os.path.join(TMP_FILES_PATH, '{:04d}_Optical_Flow{}.exr'.format(scene.frame_current, suffix1))
                         opt_flw1 = load_file_data_to_numpy(scene, tmp_file_path1, 'OptFlow')
+                        tmp_file_path0 = os.path.join(TMP_FILES_PATH, '{:04d}_Optical_Flow{}.exr'.format(scene.frame_current, suffix0))
                     else:
-                        tmp_file_path = os.path.join(TMP_FILES_PATH, '{:04d}_Optical_Flow.exr'.format(scene.frame_current))
-                        opt_flw = load_file_data_to_numpy(scene, tmp_file_path, 'OptFlow')
+                        tmp_file_path0 = os.path.join(TMP_FILES_PATH, '{:04d}_Optical_Flow.exr'.format(scene.frame_current))
+                    opt_flw0 = load_file_data_to_numpy(scene, tmp_file_path0, 'OptFlow')
             # Optional step - delete the tmp output files
-            clean_folder(TMP_FILES_PATH)
-
+            #clean_folder(TMP_FILES_PATH)
         """ Save data """
-        gt_dir_path = os.path.dirname(scene.render.filepath)
-        #print(gt_dir_path)
-        # Blender by default assumes a padding of 4 digits
-        out_path = os.path.join(gt_dir_path, '{:04d}.npz'.format(scene.frame_current))
-        #print(out_path)
-        out_dict = {'optical_flow'               : opt_flw,
-                    'segmentation_masks'         : seg_masks,
-                    'segmentation_masks_indexes' : seg_masks_indexes,
-                    'intrinsic_mat'              : intrinsic_mat,
-                    'extrinsic_mat'              : extrinsic_mat,
-                    'normal_map'                 : normal,
-                    'depth_map'                  : z,
-                    'disparity_map'              : disp,
-                    'object_poses'               : obj_poses
-                   }
-        out_dict_filtered = {k: v for k, v in out_dict.items() if v is not None}
-        np.savez_compressed(out_path, **out_dict_filtered)
-        # ref: https://stackoverflow.com/questions/35133317/numpy-save-some-arrays-at-once
+        save_data_to_npz(scene, is_stereo_activated,
+                         normal0, normal1,
+                         z0, z1, disp0, disp1,
+                         opt_flw0, opt_flw1,
+                         seg_masks0, seg_masks1,
+                         seg_masks_indexes, # Same indexes for both cameras
+                         intrinsic_mat, # Both cameras have the same intrinsic parameters
+                         extrinsic_mat, # TODO: there should be individual extrinsic mats
+                         obj_poses) # Object poses are relative to the world coordinate frame, so they are the same
+
 
 # classes
 class MyAddonProperties(PropertyGroup):
