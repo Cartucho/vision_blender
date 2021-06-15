@@ -214,6 +214,61 @@ def get_struct_array_of_obj_indexes():
     return obj_indexes
 
 
+def is_stereo_ok_for_disparity(scene):
+    if (scene.render.use_multiview and
+        scene.camera.data.stereo.convergence_mode == 'PARALLEL' and
+        scene.camera.data.stereo.pivot == 'LEFT'): # TODO: handle the case where the pivot is the right camera
+        return True
+    return False
+
+
+def load_file_data_to_numpy(scene, tmp_file_path, data_map):
+    if not os.path.isfile(tmp_file_path):
+        return None
+    out_data = bpy.data.images.load(tmp_file_path)
+    pixels_numpy = np.array(out_data.pixels[:])
+    res_x, res_y = get_scene_resolution(scene)
+    pixels_numpy.resize((res_y, res_x, 4)) # Numpy works with (y, x, channels)
+    pixels_numpy = np.flip(pixels_numpy, 0) # flip vertically (in Blender y in the image points up instead of down)
+    if data_map == 'Normal':
+        normal = pixels_numpy[:, :, 0:3]
+        return normal
+    elif data_map == 'Depth':
+        z = pixels_numpy[:, :, 0]
+        # Points at infinity get a -1 value
+        max_dist = scene.camera.data.clip_end
+        INVALID_POINT = -1.0
+        z[z > max_dist] = INVALID_POINT
+        f_x, f_y, c_x, c_y = get_camera_parameters_intrinsic(scene) # needed for z in Cycles and for disparity
+        if scene.render.engine == "CYCLES":
+            z = correct_cycles_depth(z, res_x, res_y, f_x, f_y, c_x, c_y, INVALID_POINT)
+        """ disparity """
+        # If stereo also calculate disparity
+        if not is_stereo_ok_for_disparity(scene):
+            return z
+        disp = None
+        baseline_m = scene.camera.data.stereo.interocular_distance # [m]
+        disp = np.zeros_like(z) # disp = 0.0, on the invalid points
+        disp[z != INVALID_POINT] = (baseline_m * f_x) / z[z != INVALID_POINT]
+        # Check `tmp_file_path` if it is for the left or right camera
+        suffix1 = scene.render.views[1].file_suffix
+        if suffix1 in tmp_file_path: # By default, if '_R' in `tmp_file_path`
+            np.negative(disp)
+        return z, disp
+    elif data_map == 'Segmentation':
+        tmp_seg_mask = pixels_numpy[:,:,0]
+        return tmp_seg_mask
+    elif data_map == 'OptFlow':
+        opt_flw = pixels_numpy[:,:,:2] # We are only interested in the first two channels
+        # In Blender y is up instead of down, so the y optical flow should be -
+        #opt_flw[:,:,1] = np.negative(opt_flw[:,:,1]) # channel 1 - y optical flow
+        # However, I want forward flow (from current to next frame) instead of backward (next frame to current)
+        # so I invert the optical flow both in x and y
+        opt_flw[:,:,0] = np.negative(opt_flw[:,:,0])
+        #opt_flw[:,:,1] = np.negative(opt_flw[:,:,1]) # Doing the `-` twice is the same as not doing
+        return opt_flw
+
+
 @persistent
 def load_handler_render_init(scene):
     """ This function is called before starting to render """
@@ -349,12 +404,13 @@ def load_handler_after_rend_frame(scene): # TODO: not sure if this is the best p
     # check if user wants to generate the ground truth data
     if scene.vision_blender.bool_save_gt_data:
         vision_blender = scene.vision_blender
-        gt_dir_path = os.path.dirname(scene.render.filepath)
-        #print(gt_dir_path)
-        # save ground truth data
-        #print(scene.frame_current)
+        is_stereo_activated = scene.render.use_multiview
+        if is_stereo_activated:
+            suffix0 = scene.render.views[0].file_suffix # By default '_L'
+            suffix1 = scene.render.views[1].file_suffix # By default '_R'
         """ Camera parameters """
         ## update camera - ref: https://blender.stackexchange.com/questions/5636/how-can-i-get-the-location-of-an-object-at-each-keyframe
+        #print(scene.frame_current)
         scene.frame_set(scene.frame_current) # needed to update the camera position
         intrinsic_mat = None
         extrinsic_mat = None
@@ -362,7 +418,7 @@ def load_handler_after_rend_frame(scene): # TODO: not sure if this is the best p
             ### extrinsic
             extrinsic_mat = get_camera_parameters_extrinsic(scene) # needed for objects' pose
             ### intrinsic
-            f_x, f_y, c_x, c_y = get_camera_parameters_intrinsic(scene) # needed for z in Cycles and for disparity
+            f_x, f_y, c_x, c_y = get_camera_parameters_intrinsic(scene)
             intrinsic_mat = np.array([[f_x,   0,  c_x],
                                       [  0, f_y,  c_y],
                                       [  0,   0,    1]])
@@ -371,84 +427,77 @@ def load_handler_after_rend_frame(scene): # TODO: not sure if this is the best p
         if vision_blender.bool_save_obj_poses:
             obj_poses = get_obj_poses()
         """ Get the data from the output node """
-        res_x, res_y = get_scene_resolution(scene)
         if check_if_node_exists(scene.node_tree, 'output_vision_blender'):
             node_output = scene.node_tree.nodes['output_vision_blender']
             TMP_FILES_PATH = node_output.base_path
             """ Normal map """
             normal = None
             if vision_blender.bool_save_normals:
-                tmp_file_path = os.path.join(TMP_FILES_PATH, '{:04d}_Normal.exr'.format(scene.frame_current))
-                if os.path.isfile(tmp_file_path):
-                    out_data = bpy.data.images.load(tmp_file_path)
-                    pixels_numpy = np.array(out_data.pixels[:])
-                    pixels_numpy.resize((res_y, res_x, 4)) # Numpy works with (y, x, channels)
-                    normal = pixels_numpy[:, :, 0:3]
-                    normal = np.flip(normal, 0) # flip vertically (in Blender y in the image points up instead of down)
+                if is_stereo_activated:
+                    tmp_file_path0 = os.path.join(TMP_FILES_PATH, '{:04d}_Normal{}.exr'.format(scene.frame_current, suffix0))
+                    normal = load_file_data_to_numpy(scene, tmp_file_path0, 'Normal')
+                    #tmp_file_path1 = os.path.join(TMP_FILES_PATH, '{:04d}_Normal{}.exr'.format(scene.frame_current, suffix1))
+                    #normal1 = load_file_data_to_numpy(scene, tmp_file_path1, 'Normal')
+                else:
+                    tmp_file_path = os.path.join(TMP_FILES_PATH, '{:04d}_Normal.exr'.format(scene.frame_current))
+                    normal = load_file_data_to_numpy(scene, tmp_file_path, 'Normal')
             """ Depth + Disparity """
             z = None
             disp = None
             if vision_blender.bool_save_depth:
-                tmp_file_path = os.path.join(TMP_FILES_PATH, '{:04d}_Depth.exr'.format(scene.frame_current))
-                if os.path.isfile(tmp_file_path):
-                    out_data = bpy.data.images.load(tmp_file_path)
-                    pixels_numpy = np.array(out_data.pixels[:])
-                    pixels_numpy.resize((res_y, res_x, 4)) # Numpy works with (y, x, channels)
-                    z = pixels_numpy[:, :, 0]
-                    z = np.flip(z, 0) # flip vertically (in Blender y in the image points up instead of down)
-                    # points at infinity get a -1 value
-                    max_dist = scene.camera.data.clip_end
-                    INVALID_POINT = -1.0
-                    z[z > max_dist] = INVALID_POINT
-                    if scene.render.engine == "CYCLES":
-                        z = correct_cycles_depth(z, res_x, res_y, f_x, f_y, c_x, c_y, INVALID_POINT)
-                    """ disparity """
-                    # If stereo also calculate disparity
-                    cam = scene.camera
-                    if (scene.render.use_multiview and
-                        cam.data.stereo.convergence_mode == 'PARALLEL' and
-                        cam.data.stereo.pivot == 'LEFT'): # TODO: handle the case where the pivot is the right camera
-                        baseline_m = cam.data.stereo.interocular_distance # [m]
-                        disp = np.zeros_like(z) # disp = 0.0, on the invalid points
-                        disp[z != INVALID_POINT] = (baseline_m * f_x) / z[z != INVALID_POINT]
+                if is_stereo_activated:
+                    tmp_file_path0 = os.path.join(TMP_FILES_PATH, '{:04d}_Depth{}.exr'.format(scene.frame_current, suffix0))
+                    z, disp = load_file_data_to_numpy(scene, tmp_file_path0, 'Depth')
+                    #tmp_file_path1 = os.path.join(TMP_FILES_PATH, '{:04d}_Depth{}.exr'.format(scene.frame_current, suffix1))
+                    #z1, disp1 = load_file_data_to_numpy(scene, tmp_file_path1, 'Depth')
+                else:
+                    tmp_file_path = os.path.join(TMP_FILES_PATH, '{:04d}_Depth.exr'.format(scene.frame_current))
+                    z = load_file_data_to_numpy(scene, tmp_file_path, 'Depth')
             if scene.render.engine == "CYCLES":
                 """ Segmentation masks """
                 seg_masks = None
                 seg_masks_indexes = None
-                if vision_blender.bool_save_segmentation_masks:
+                if vision_blender.bool_save_segmentation_masks and check_any_obj_with_non_zero_index():
                     for obj_pass_ind in get_set_of_non_zero_obj_ind():
-                        tmp_file_path = os.path.join(TMP_FILES_PATH, '{:04d}_Segmentation_Mask_{}.exr'.format(scene.frame_current, obj_pass_ind))
-                        if os.path.isfile(tmp_file_path):
+                        if is_stereo_activated:
+                            tmp_file_path0 = os.path.join(TMP_FILES_PATH, '{:04d}_Segmentation_Mask_{}{}.exr'.format(scene.frame_current, obj_pass_ind, suffix0))
+                            tmp_seg_mask = load_file_data_to_numpy(scene, tmp_file_path0, 'Segmentation')
                             if seg_masks is None:
-                                seg_masks = np.zeros((res_y, res_x), dtype=np.uint16)
-                            out_data = bpy.data.images.load(tmp_file_path)
-                            pixels_numpy = np.array(out_data.pixels[:])
-                            pixels_numpy.resize((res_y, res_x, 4)) # Numpy works with (y, x, channels)
-                            tmp_seg_mask = pixels_numpy[:,:,0]
-                            tmp_seg_mask = np.flip(tmp_seg_mask, 0) # flip vertically (in Blender y in the image points up instead of down)
-                            seg_masks[tmp_seg_mask != 0] = obj_pass_ind
+                                seg_masks = tmp_seg_mask
+                            else:
+                                seg_masks[tmp_seg_mask != 0] = obj_pass_ind # Accumulate
+                            #tmp_file_path1 = os.path.join(TMP_FILES_PATH, '{:04d}_Segmentation_Mask_{}{}.exr'.format(scene.frame_current, obj_pass_ind, suffix1))
+                            #tmp_seg_mask1 = load_file_data_to_numpy(scene, tmp_file_path1, 'Segmentation')
+                            #if seg_masks1 is None:
+                            #    seg_masks1 = tmp_seg_mask1
+                            #else:
+                            #    seg_masks1[tmp_seg_mask1 != 0] = obj_pass_ind # Accumulate
+                        else:
+                            tmp_file_path = os.path.join(TMP_FILES_PATH, '{:04d}_Segmentation_Mask_{}.exr'.format(scene.frame_current, obj_pass_ind))
+                            tmp_seg_mask = load_file_data_to_numpy(scene, tmp_file_path, 'Segmentation')
+                            if seg_masks is None:
+                                seg_masks = tmp_seg_mask
+                            else:
+                                seg_masks[tmp_seg_mask != 0] = obj_pass_ind # Accumulate
                     if seg_masks is not None:
                         seg_masks_indexes = get_struct_array_of_obj_indexes()
                 """ Optical flow - Forward -> from current to next frame"""
                 opt_flw = None
                 if vision_blender.bool_save_opt_flow:
-                    tmp_file_path = os.path.join(TMP_FILES_PATH, '{:04d}_Optical_Flow.exr'.format(scene.frame_current))
-                    if os.path.isfile(tmp_file_path):
-                        out_data = bpy.data.images.load(tmp_file_path)
-                        pixels_numpy = np.array(out_data.pixels[:])
-                        pixels_numpy.resize((res_y, res_x, 4)) # Numpy works with (y, x, channels)
-                        opt_flw = pixels_numpy[:,:,:2] # We are only interested in the first two channels
-                        opt_flw = np.flip(opt_flw, 0) # flip vertically (in Blender y in the image points up instead of down)
-                        # In Blender y is up instead of down, so the y optical flow should be -
-                        #opt_flw[:,:,1] = np.negative(opt_flw[:,:,1]) # channel 1 - y optical flow
-                        # However, I want forward flow (from current to next frame) instead of backward (next frame to current)
-                        # so I invert the optical flow both in x and y
-                        opt_flw[:,:,0] = np.negative(opt_flw[:,:,0])
-                        #opt_flw[:,:,1] = np.negative(opt_flw[:,:,1]) # Doing the `-` twice is the same as not doing
+                    if is_stereo_activated:
+                        tmp_file_path0 = os.path.join(TMP_FILES_PATH, '{:04d}_Optical_Flow{}.exr'.format(scene.frame_current, suffix0))
+                        opt_flw = load_file_data_to_numpy(scene, tmp_file_path0, 'OptFlow')
+                        tmp_file_path1 = os.path.join(TMP_FILES_PATH, '{:04d}_Optical_Flow{}.exr'.format(scene.frame_current, suffix1))
+                        opt_flw1 = load_file_data_to_numpy(scene, tmp_file_path1, 'OptFlow')
+                    else:
+                        tmp_file_path = os.path.join(TMP_FILES_PATH, '{:04d}_Optical_Flow.exr'.format(scene.frame_current))
+                        opt_flw = load_file_data_to_numpy(scene, tmp_file_path, 'OptFlow')
             # Optional step - delete the tmp output files
             clean_folder(TMP_FILES_PATH)
 
         """ Save data """
+        gt_dir_path = os.path.dirname(scene.render.filepath)
+        #print(gt_dir_path)
         # Blender by default assumes a padding of 4 digits
         out_path = os.path.join(gt_dir_path, '{:04d}.npz'.format(scene.frame_current))
         #print(out_path)
