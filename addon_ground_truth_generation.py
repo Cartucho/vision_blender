@@ -481,12 +481,21 @@ def load_handler_after_rend_frame(scene): # TODO: not sure if this is the best p
         if vision_blender.bool_save_obj_poses:
             obj_poses = get_obj_poses()
         """ Get the data from the output node """
+        normal0 = None
+        normal1 = None
+        z0 = None
+        z1 = None
+        disp0 = None
+        disp1 = None
+        seg_masks0 = None
+        seg_masks1 = None
+        seg_masks_indexes = None
+        opt_flw0 = None
+        opt_flw1 = None
         if check_if_node_exists(scene.node_tree, 'output_vision_blender'):
             node_output = scene.node_tree.nodes['output_vision_blender']
             TMP_FILES_PATH = node_output.base_path
             """ Normal map """
-            normal0 = None
-            normal1 = None
             if vision_blender.bool_save_normals:
                 if is_stereo_activated:
                     tmp_file_path1 = os.path.join(TMP_FILES_PATH, '{:04d}_Normal{}.exr'.format(scene.frame_current, suffix1))
@@ -496,10 +505,6 @@ def load_handler_after_rend_frame(scene): # TODO: not sure if this is the best p
                     tmp_file_path0 = os.path.join(TMP_FILES_PATH, '{:04d}_Normal.exr'.format(scene.frame_current))
                 normal0 = load_file_data_to_numpy(scene, tmp_file_path0, 'Normal')
             """ Depth + Disparity """
-            z0 = None
-            z1 = None
-            disp0 = None
-            disp1 = None
             if vision_blender.bool_save_depth:
                 if is_stereo_activated:
                     tmp_file_path1 = os.path.join(TMP_FILES_PATH, '{:04d}_Depth{}.exr'.format(scene.frame_current, suffix1))
@@ -510,9 +515,6 @@ def load_handler_after_rend_frame(scene): # TODO: not sure if this is the best p
                 z0, disp0 = load_file_data_to_numpy(scene, tmp_file_path0, 'Depth')
             if scene.render.engine == "CYCLES":
                 """ Segmentation masks """
-                seg_masks0 = None
-                seg_masks1 = None
-                seg_masks_indexes = None
                 if vision_blender.bool_save_segmentation_masks and check_any_obj_with_non_zero_index():
                     seg_masks_indexes = get_struct_array_of_obj_indexes()
                     if is_stereo_activated:
@@ -522,10 +524,7 @@ def load_handler_after_rend_frame(scene): # TODO: not sure if this is the best p
                     else:
                         tmp_file_path0 = os.path.join(TMP_FILES_PATH, '{:04d}_Segmentation_Mask.exr'.format(scene.frame_current))
                     seg_masks0 = load_file_data_to_numpy(scene, tmp_file_path0, 'Segmentation')
-
                 """ Optical flow - Forward -> from current to next frame"""
-                opt_flw0 = None
-                opt_flw1 = None
                 if vision_blender.bool_save_opt_flow:
                     if is_stereo_activated:
                         tmp_file_path1 = os.path.join(TMP_FILES_PATH, '{:04d}_Optical_Flow{}.exr'.format(scene.frame_current, suffix1))
