@@ -547,6 +547,14 @@ def load_handler_after_rend_frame(scene): # TODO: not sure if this is the best p
                          obj_poses) # Object poses are relative to the world coordinate frame, so they are the same
 
 
+@persistent
+def load_handler_after_rend_finish(scene):
+    if check_if_node_exists(scene.node_tree, 'output_vision_blender'):
+        node_output = scene.node_tree.nodes['output_vision_blender']
+        TMP_FILES_PATH = node_output.base_path
+        shutil.rmtree(TMP_FILES_PATH)
+
+
 # classes
 class MyAddonProperties(PropertyGroup):
     # booleans
@@ -713,6 +721,10 @@ def register():
     bpy.app.handlers.render_init.append(load_handler_render_init)
     # register the function being called after rendering each frame
     bpy.app.handlers.render_post.append(load_handler_after_rend_frame)
+    # register the function being called after rendering all the frames, or being cancelled
+    bpy.app.handlers.render_complete.append(load_handler_after_rend_finish)
+    bpy.app.handlers.render_cancel.append(load_handler_after_rend_finish)
+
 
 def unregister():
     # unregister the classes
@@ -724,6 +736,10 @@ def unregister():
     bpy.app.handlers.render_init.remove(load_handler_render_init)
     # unregister the function being called after rendering each frame
     bpy.app.handlers.render_post.remove(load_handler_after_rend_frame)
+    # unregister the function being called after rendering all the frames, or being cancelled
+    bpy.app.handlers.render_complete.append(load_handler_after_rend_finish)
+    bpy.app.handlers.render_cancel.append(load_handler_after_rend_finish)
+
 
 if __name__ == "__main__": # only for live edit.
     register()
