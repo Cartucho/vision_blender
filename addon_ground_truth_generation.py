@@ -336,19 +336,19 @@ def load_handler_render_init(scene):
         if not scene.use_nodes:
             scene.use_nodes = True
         if vision_blender.bool_save_depth:
-            if not scene.view_layers["ViewLayer"].use_pass_z:
-                scene.view_layers["ViewLayer"].use_pass_z = True
+            if not scene.view_layers["View Layer"].use_pass_z:
+                scene.view_layers["View Layer"].use_pass_z = True
         if vision_blender.bool_save_normals:
-            if not scene.view_layers["ViewLayer"].use_pass_normal:
-                scene.view_layers["ViewLayer"].use_pass_normal = True
+            if not scene.view_layers["View Layer"].use_pass_normal:
+                scene.view_layers["View Layer"].use_pass_normal = True
         ## Segmentation masks and optical flow only work in Cycles
         if scene.render.engine == 'CYCLES':
             if vision_blender.bool_save_segmentation_masks:
-                if not scene.view_layers["ViewLayer"].use_pass_object_index:
-                    scene.view_layers["ViewLayer"].use_pass_object_index = True
+                if not scene.view_layers["View Layer"].use_pass_object_index:
+                    scene.view_layers["View Layer"].use_pass_object_index = True
             if vision_blender.bool_save_opt_flow:
-                if not scene.view_layers["ViewLayer"].use_pass_vector:
-                    scene.view_layers["ViewLayer"].use_pass_vector = True
+                if not scene.view_layers["View Layer"].use_pass_vector:
+                    scene.view_layers["View Layer"].use_pass_vector = True
 
         """ All the data will be saved to a MultiLayer OpenEXR image. """
         # 2. Set-up nodes
