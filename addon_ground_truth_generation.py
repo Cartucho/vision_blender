@@ -681,7 +681,7 @@ class RENDER_PT_gt_generator(GroundTruthGeneratorPanel):
         row_intr_2.label(text='1')
 
         """ show extrinsic parameters """
-        layout.label(text="Extrinsic parameters [pixels]:")
+        layout.label(text="Extrinsic parameters:")
 
         extr = get_camera_parameters_extrinsic(scene)
 
