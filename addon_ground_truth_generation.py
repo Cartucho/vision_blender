@@ -130,17 +130,6 @@ def get_obj_poses():
     return obj_poses
 
 
-def correct_cycles_depth(z_map, res_x, res_y, f_x, f_y, c_x, c_y, INVALID_POINT):
-    for y in range(res_y):
-        b = ((c_y - y) / f_y)
-        for x in range(res_x):
-            val = z_map[y][x]
-            if val != INVALID_POINT:
-                a = ((c_x - x) / f_x)
-                z_map[y][x] = val / np.linalg.norm([1, a, b])
-    return z_map
-
-
 def check_if_node_exists(tree, node_name):
     node_ind = tree.nodes.find(node_name)
     if node_ind == -1:
@@ -248,9 +237,6 @@ def load_file_data_to_numpy(scene, tmp_file_path, data_map):
         max_dist = scene.camera.data.clip_end
         INVALID_POINT = -1.0
         z[z > max_dist] = INVALID_POINT
-        f_x, f_y, c_x, c_y = get_camera_parameters_intrinsic(scene) # needed for z in Cycles and for disparity
-        if scene.render.engine == "CYCLES":
-            z = correct_cycles_depth(z, res_x, res_y, f_x, f_y, c_x, c_y, INVALID_POINT)
         """ disparity """
         # If stereo also calculate disparity
         disp = None
@@ -258,6 +244,7 @@ def load_file_data_to_numpy(scene, tmp_file_path, data_map):
             return z, disp
         baseline_m = scene.camera.data.stereo.interocular_distance # [m]
         disp = np.zeros_like(z) # disp = 0.0, on the invalid points
+        f_x, _f_y, _c_x, _c_y = get_camera_parameters_intrinsic(scene) # needed for z in Cycles and for disparity
         disp[z != INVALID_POINT] = (baseline_m * f_x) / z[z != INVALID_POINT]
         # Check `tmp_file_path` if it is for the left or right camera
         suffix1 = scene.render.views[1].file_suffix
