@@ -74,6 +74,7 @@ try:
 
     if 'normal_map' in data.files:
         normals = data['normal_map']
+        normals = (normals + 1.) / 2
         cv.imshow("Surface normals", normals)
 
     if 'segmentation_masks' in data.files:
