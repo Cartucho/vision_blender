@@ -3,7 +3,7 @@ bl_info = {
         "name":"VisionBlender - Computer Vision Ground Truth Generation",
         "description":"Generate ground truth data (e.g., depth map) for Computer Vision applications.",
         "author":"Joao Cartucho",
-        "version":(1, 0),
+        "version":(1, 1),
         "blender":(2, 83, 4),
         "location":"PROPERTIES",
         "warning":"", # used for warning icon and text in addons panel
@@ -19,7 +19,8 @@ import numpy as np
 
 import bpy
 from bpy.props import (BoolProperty,
-                   PointerProperty
+                   PointerProperty,
+                   FloatVectorProperty
                    )
 from bpy.types import (Panel,
                    Operator,
@@ -581,6 +582,34 @@ class MyAddonProperties(PropertyGroup):
         default = True
         )
 
+    def get_cam_intrinsic(self):
+        scene = bpy.context.scene
+        f_x, f_y, c_x, c_y = get_camera_parameters_intrinsic(scene)
+        intrinsic_mat = np.array([[f_x,   0,  c_x],
+                                  [  0, f_y,  c_y],
+                                  [  0,   0,    1]])
+        return intrinsic_mat.flatten("F").tolist()
+
+    cam_intrinsic : FloatVectorProperty(
+        name="Intrinsic",
+        size=9,
+        subtype="MATRIX",
+        get=get_cam_intrinsic
+        )
+
+    def get_cam_extrinsic(self):
+        scene = bpy.context.scene
+        extr_mat = get_camera_parameters_extrinsic(scene)
+        extr_mat = np.vstack([extr_mat, [0, 0, 0, 1]])
+        return extr_mat.flatten("F").tolist()
+
+
+    cam_extrinsic : FloatVectorProperty(
+        name="extrinsic",
+        size=16,
+        subtype="MATRIX",
+        get=get_cam_extrinsic
+        )
 
 class GroundTruthGeneratorPanel(Panel):
     """Creates a Panel in the Output properties window for exporting ground truth data"""
@@ -591,7 +620,6 @@ class GroundTruthGeneratorPanel(Panel):
 
 class RENDER_PT_gt_generator(GroundTruthGeneratorPanel):
     """Parent panel"""
-    global intrinsic_mat
     bl_label = "VisionBlender UI"
     bl_idname = "RENDER_PT_gt_generator"
     COMPAT_ENGINES = {'BLENDER_EEVEE', 'CYCLES'}
