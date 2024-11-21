@@ -226,6 +226,7 @@ def load_file_data_to_numpy(scene, tmp_file_path, data_map):
         return None
     out_data = bpy.data.images.load(tmp_file_path)
     pixels_numpy = np.array(out_data.pixels[:])
+    bpy.data.images.remove(out_data)
     res_x, res_y = get_scene_resolution(scene)
     pixels_numpy.resize((res_y, res_x, 4)) # Numpy works with (y, x, channels)
     pixels_numpy = np.flip(pixels_numpy, 0) # flip vertically (in Blender y in the image points up instead of down)
